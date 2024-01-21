@@ -44,6 +44,20 @@ app.get("/api/trending", async (req, res) => {
   }
 });
 
+app.get("/api/getmovie/:id", async (req, res) => {
+  try {
+    const movieResponse = await axios.get(
+      `https://api.themoviedb.org/3/movie/${req.params.id}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits,images,similar,videos`
+    );
+    res.send(movieResponse.data);
+  } catch (error) {
+    console.error(`Error: ${error}`);
+    res
+      .status(500)
+      .send("An error occurred while trying to fetch the movie data");
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
