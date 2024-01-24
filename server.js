@@ -5,7 +5,7 @@ require("dotenv").config();
 
 const app = express();
 app.use(cors());
-const port = 8080;
+const port = process.env.PORT || 8080;
 
 app.get("/api/trending", async (req, res) => {
   try {
@@ -47,7 +47,7 @@ app.get("/api/trending", async (req, res) => {
 app.get("/api/getmovie/:id", async (req, res) => {
   try {
     const movieResponse = await axios.get(
-      `https://api.themoviedb.org/3/movie/${req.params.id}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits,images,similar,videos,watch/providers`
+      `https://api.themoviedb.org/3/movie/${req.params.id}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits,images,similar,videos,watch/providers,release_dates`
     );
     res.send(movieResponse.data);
   } catch (error) {
