@@ -58,6 +58,20 @@ app.get("/api/getmovie/:id", async (req, res) => {
   }
 });
 
+app.get("/api/getuserlocation", async (req, res) => {
+  try {
+    const locationResponse = await axios.get(
+      `https://geolocation-db.com/json/${process.env.GEOLOCATION_DB_API_KEY}`
+    );
+    res.send(locationResponse.data);
+  } catch (error) {
+    console.error(`Error: ${error}`);
+    res
+      .status(500)
+      .send("An error occurred while trying to fetch the user location");
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
