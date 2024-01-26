@@ -58,6 +58,20 @@ app.get("/api/getmovie/:id", async (req, res) => {
   }
 });
 
+app.get("/api/search/:query", async (req, res) => {
+  try {
+    const searchResponse = await axios.get(
+      `https://api.themoviedb.org/3/search/movie?api_key=${process.env.TMDB_API_KEY}&query=${req.params.query}`
+    );
+    res.send(searchResponse.data);
+  } catch (error) {
+    console.error(`Error: ${error}`);
+    res
+      .status(500)
+      .send("An error occurred while trying to fetch the search results");
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
