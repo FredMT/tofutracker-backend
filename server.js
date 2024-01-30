@@ -166,7 +166,9 @@ app.get("/api/getmovie/:id", async (req, res) => {
     );
 
     if (error) {
-      console.error(`Error inserting ${movieId}data to tmdb_movies: ${error}`);
+      console.error(
+        `Error inserting ${movieId}data to tmdb_movies: ${error.message}`
+      );
       return;
     }
 
@@ -291,7 +293,10 @@ app.get("/api/getmovie/:id", async (req, res) => {
       return;
     }
 
-    const castRows = movieResponse.data.credits.cast.map((cast) => ({
+    const sortedCastByPopularity = movieResponse.data.credits.cast
+      .sort((a, b) => b.popularity - a.popularity)
+      .slice(0, 100);
+    const castRows = sortedCastByPopularity.map((cast) => ({
       id: cast.credit_id,
       person_id: cast.id,
       movie_id: movieId,
@@ -314,7 +319,10 @@ app.get("/api/getmovie/:id", async (req, res) => {
       return;
     }
 
-    const crewRows = movieResponse.data.credits.crew.map((crew) => ({
+    const sortedCrewByPopularity = movieResponse.data.credits.crew
+      .sort((a, b) => b.popularity - a.popularity)
+      .slice(0, 100);
+    const crewRows = sortedCrewByPopularity.map((crew) => ({
       id: crew.credit_id,
       person_id: crew.id,
       movie_id: movieId,
@@ -351,7 +359,7 @@ app.get("/api/getmovie/:id", async (req, res) => {
       );
       return;
     }
- 
+
     res.send(movieResponse.data);
   } catch (error) {
     console.error(`Error: ${error}`);
