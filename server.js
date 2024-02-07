@@ -12,6 +12,7 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
+//To be changed as it makes a new request everytime
 app.get("/api/trending", async (req, res) => {
   try {
     const trendingResponse = await axios.get(
