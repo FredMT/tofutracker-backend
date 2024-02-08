@@ -383,152 +383,82 @@ app.get("/api/search/:query", async (req, res) => {
   }
 });
 
-// app.get("/api/gettv/:id", async (req, res) => {
-//   try {
-//     const tvId = req.params.id;
-
-//     // First, check if the movie already exists in the Supabase database
-//     const { data: existingTV, error: existingTVError } = await supabase
-//       .from("tmdb_tv_json")
-//       .select("tv_data")
-//       .eq("id", tvId)
-//       .single();
-
-//     if (existingTVError && existingTVError.code !== "PGRST116") {
-//       console.error("Error fetching existing movie:", existingTVError);
-//       return res
-//         .status(500)
-//         .send("An error occurred while trying to fetch the movie data");
-//     }
-
-//     // Return movie from database if it already exists
-//     if (existingTV) {
-//       return res.json({
-//         ...existingTV.tv_data,
-//       });
-//     }
-
-//     // If the TV show does not exist in the database, proceed with the TMDB API call
-//     const tvResponse = await axios.get(
-//       `https://api.themoviedb.org/3/tv/${tvId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=aggregate_credits,content_ratings,images,recommendations,videos,watch/providers,external_ids,credits`
-//     );
-
-//     const numberOfSeasons = tvResponse.data.number_of_seasons;
-//     let seasons = [];
-
-//     // Function to fetch seasons in batches
-//     async function fetchSeasonsBatch(tvId, startSeason, endSeason) {
-//       let appendToResponse = Array.from(
-//         { length: endSeason - startSeason },
-//         (_, i) => `season/${i + startSeason}`
-//       ).join(",");
-//       try {
-//         const response = await axios.get(
-//           `https://api.themoviedb.org/3/tv/${tvId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=${appendToResponse}`
-//         );
-//         return Array.from(
-//           { length: endSeason - startSeason },
-//           (_, i) => response.data[`season/${i + startSeason}`]
-//         ).filter(Boolean);
-//       } catch (error) {
-//         console.error(
-//           `Error fetching seasons ${startSeason} to ${endSeason}:`,
-//           error
-//         );
-//         return [];
-//       }
-//     }
-
-//     // Fetch all seasons in parallel, considering the API's limit
-//     const maxAppendEndpoints = 20;
-//     for (let i = 0; i < numberOfSeasons; i += maxAppendEndpoints) {
-//       const batch = await fetchSeasonsBatch(
-//         tvId,
-//         i,
-//         Math.min(i + maxAppendEndpoints, numberOfSeasons)
-//       );
-//       seasons = seasons.concat(batch);
-//     }
-
-//     res.status(200).send(seasons);
-
-//     // Insert the fetched TV details into the Supabase database
-//     try {
-//       const { error } = await supabase
-//         .from("tmdb_tv_json")
-//         .insert([{ id: tvId, tv_data: tvResponse.data }]);
-//       if (error) throw error;
-//     } catch (dbError) {
-//       console.error(`Error inserting TV details into database: ${dbError}`);
-//       return res
-//         .status(500)
-//         .send("An error occurred while trying to save the TV details");
-//     }
-//   } catch (error) {
-//     console.error(`Error: ${error}`);
-//     res
-//       .status(500)
-//       .send("An error occurred while trying to fetch the TV results");
-//   }
-// });
-
 app.get("/api/gettv/:id", async (req, res) => {
   try {
     const tvId = req.params.id;
 
-    // Check if the TV show already exists in the Supabase database
-    const { data: existingTV, error: existingTVError } = await supabase
-      .from("tmdb_tv_json")
-      .select("tv_data")
-      .eq("id", tvId)
-      .single();
-
-    if (existingTVError && existingTVError.code !== "PGRST116") {
-      console.error("Error fetching existing TV show:", existingTVError);
-      return res
-        .status(500)
-        .send("An error occurred while trying to fetch the TV show data");
+    let existingTV;
+    try {
+      const response = await supabase
+        .from("tmdb_tv_json")
+        .select("tv_data")
+        .eq("id", tvId)
+        .single();
+      existingTV = response.data;
+    } catch (existingTVError) {
+      if (existingTVError.code !== "PGRST116") {
+        console.error("Error fetching existing TV show:", existingTVError);
+        return res
+          .status(500)
+          .send("An error occurred while trying to fetch the TV show data");
+      }
     }
 
-    // Return TV show from database if it already exists
     if (existingTV) {
       return res.json(existingTV.tv_data);
     }
 
-    // If the TV show does not exist in the database, proceed with the TMDB API call
-    const tvResponse = await axios.get(
-      `https://api.themoviedb.org/3/tv/${tvId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=aggregate_credits,content_ratings,images,recommendations,videos,watch/providers,external_ids,credits`
-    );
+    let tvResponse;
+    try {
+      tvResponse = await axios.get(
+        `https://api.themoviedb.org/3/tv/${tvId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=aggregate_credits,content_ratings,images,recommendations,videos,watch/providers,external_ids,credits`
+      );
+    } catch (tvFetchError) {
+      console.error(
+        `Error fetching TV show details from TMDB: ${tvFetchError}`
+      );
+      return res
+        .status(500)
+        .send(
+          "An error occurred while trying to fetch the TV show details from TMDB"
+        );
+    }
 
-    // Insert the fetched TV show details into the Supabase database
-    const { error: tvInsertError } = await supabase
-      .from("tmdb_tv_json")
-      .insert([{ id: tvId, tv_data: tvResponse.data }]);
-
-    if (tvInsertError)
+    try {
+      await supabase
+        .from("tmdb_tv_json")
+        .insert([{ id: tvId, tv_data: tvResponse.data }]);
+    } catch (tvInsertError) {
+      console.error(
+        `Error inserting TV show details into database: ${tvInsertError}`
+      );
       return res
         .status(500)
         .send("An error occurred while trying to save the TV show details");
+    }
 
     const numberOfSeasons = tvResponse.data.number_of_seasons;
     let seasons = [];
 
-    // Function to fetch seasons in batches
     async function fetchSeasonsBatch(startSeason, endSeason) {
       let appendToResponse = Array.from(
         { length: endSeason - startSeason + 1 },
         (_, i) => `season/${i + startSeason}`
       ).join(",");
-      const response = await axios.get(
-        `https://api.themoviedb.org/3/tv/${tvId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=${appendToResponse}`
-      );
-      return Array.from(
-        { length: endSeason - startSeason + 1 },
-        (_, i) => response.data[`season/${i + startSeason}`]
-      ).filter(Boolean);
+      try {
+        const response = await axios.get(
+          `https://api.themoviedb.org/3/tv/${tvId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=${appendToResponse}`
+        );
+        return Array.from(
+          { length: endSeason - startSeason + 1 },
+          (_, i) => response.data[`season/${i + startSeason}`]
+        ).filter(Boolean);
+      } catch (seasonFetchError) {
+        console.error(`Error fetching season batch: ${seasonFetchError}`);
+        return []; // Return an empty array to avoid breaking the flow
+      }
     }
 
-    // Fetch all seasons in parallel, considering the API's limit
     const maxAppendEndpoints = 20;
     for (let i = 0; i <= numberOfSeasons; i += maxAppendEndpoints) {
       const endSeason = Math.min(i + maxAppendEndpoints - 1, numberOfSeasons);
@@ -536,28 +466,38 @@ app.get("/api/gettv/:id", async (req, res) => {
       seasons = seasons.concat(batch);
     }
 
-    // Insert seasons into Supabase
-    const seasonInserts = seasons.map((season) => ({
-      tv_id: tvId,
-      season_number: season.season_number,
-      season_json: season,
-    }));
+    try {
+      const seasonInserts = seasons.map((season) => ({
+        tv_id: tvId,
+        season_number: season.season_number,
+        season_json: season,
+      }));
+      const { error: seasonInsertError } = await supabase
+        .from("tmdb_tv_seasons_json")
+        .insert(seasonInserts);
 
-    const { error: seasonInsertError } = await supabase
-      .from("tmdb_tv_seasons_json")
-      .insert(seasonInserts);
-
-    if (seasonInsertError)
+      if (seasonInsertError) {
+        console.error(
+          `Error inserting seasons into database: ${seasonInsertError}`
+        );
+      }
+    } catch (seasonInsertError) {
+      console.error(
+        `Error inserting seasons into database: ${seasonInsertError}`
+      );
       return res
         .status(500)
         .send("An error occurred while trying to save the TV show seasons");
+    }
 
     res.status(200).send({ tvDetails: tvResponse.data, seasons });
   } catch (error) {
-    console.error(`Error: ${error}`);
+    console.error(`Global error handler: ${error}`);
     res
       .status(500)
-      .send("An error occurred while trying to fetch the TV show details");
+      .send(
+        "An unexpected error occurred while processing the TV show details"
+      );
   }
 });
 
