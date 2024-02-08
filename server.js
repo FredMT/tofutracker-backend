@@ -412,8 +412,21 @@ app.get("/api/gettv/:id", async (req, res) => {
           .sort((a, b) => a.order - b.order)
           .slice(0, 50);
       }
+
       if (tvData.aggregate_credits && tvData.aggregate_credits.crew) {
         tvData.aggregate_credits.crew = tvData.aggregate_credits.crew
+          .sort((a, b) => b.popularity - a.popularity)
+          .slice(0, 50);
+      }
+
+      if (tvData.credits.cast && tvData.credits.cast) {
+        tvData.credits.cast = tvData.credits.cast
+          .sort((a, b) => a.order - b.order)
+          .slice(0, 50);
+      }
+
+      if (tvData.credits && tvData.credits.crew) {
+        tvData.credits.crew = tvData.credits.crew
           .sort((a, b) => b.popularity - a.popularity)
           .slice(0, 50);
       }
