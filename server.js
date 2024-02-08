@@ -468,9 +468,10 @@ app.get("/api/gettv/:id", async (req, res) => {
 
     try {
       const seasonInserts = seasons.map((season) => ({
+        id: season._id,
         tv_id: tvId,
         season_number: season.season_number,
-        season_json: season,
+        json: season,
       }));
       const { error: seasonInsertError } = await supabase
         .from("tmdb_tv_seasons_json")
