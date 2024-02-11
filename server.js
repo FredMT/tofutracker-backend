@@ -93,8 +93,6 @@ app.get("/api/getmovie/:id", async (req, res) => {
 
     const logo_path = highestVotedLogo ? highestVotedLogo.file_path : null;
     const genres = movieResponse.data.genres;
-    const spokenLanguages = movieResponse.data.spoken_languages;
-    const production_companies = movieResponse.data.production_companies;
     let certification;
     const usReleaseDates = movieResponse.data.release_dates.results.filter(
       (release) => release.iso_3166_1 === "US"
@@ -110,24 +108,6 @@ app.get("/api/getmovie/:id", async (req, res) => {
     const movieGenreRows = genres.map((genre) => ({
       movie_id: movieId,
       genre_id: genre.id,
-    }));
-
-    // Create an array of objects for batch insertion
-    const spokenLanguagesRows = spokenLanguages.map((language) => ({
-      movie_id: movieId,
-      name: language.english_name,
-    }));
-
-    const productionCompanies = production_companies.map((company) => ({
-      id: company.id,
-      name: company.name,
-      logo_path: company.logo_path,
-      origin_country: company.origin_country,
-    }));
-
-    const productionCompaniesRows = productionCompanies.map((company) => ({
-      movie_id: movieId,
-      company_id: company.id,
     }));
 
     const { error } = await supabase.from("tmdb_movies").upsert(
@@ -183,166 +163,6 @@ app.get("/api/getmovie/:id", async (req, res) => {
     if (movies_genres_error) {
       console.error(
         `Error inserting ${movieId} to tmdb_movies_genres junction table: ${movies_genres_error}`
-      );
-      return;
-    }
-
-    const { error: spoken_languages_error } = await supabase
-      .from("tmdb_spoken_languages")
-      .insert(spokenLanguagesRows);
-
-    // Handle any errors
-    if (spoken_languages_error) {
-      console.error(
-        `Error inserting ${movieId} to tmdb_spoken_languages: ${spoken_languages_error}`
-      );
-      return;
-    }
-
-    // Fetch existing production company IDs from the database
-    const {
-      data: existingProductionCompanies,
-      error: existing_production_companies_error,
-    } = await supabase.from("tmdb_production_companies").select("id");
-
-    if (existing_production_companies_error) {
-      console.error(
-        `Error fetching ${movieId}'s existing production companies: ${existing_production_companies_error}`
-      );
-      return;
-    }
-
-    // Extract existing IDs for comparison
-    const existingIDs = existingProductionCompanies.map(
-      (company) => company.id
-    );
-
-    // Filter out production companies already in the database
-    const newProductionCompanies = productionCompanies.filter(
-      (company) => !existingIDs.includes(company.id)
-    );
-
-    // Insert new production companies
-    if (newProductionCompanies.length > 0) {
-      const { error: new_production_companies_error } = await supabase
-        .from("tmdb_production_companies")
-        .insert(
-          newProductionCompanies.map((company) => ({
-            ...company,
-            logo_path: `https://image.tmdb.org/t/p/original${company.logo_path}`,
-          }))
-        );
-
-      if (new_production_companies_error) {
-        console.error(
-          `Error inserting ${movieId}'s new production companies: ${new_production_companies_error}`
-        );
-        return;
-      }
-    }
-
-    const { error: production_companies_error } = await supabase
-      .from("tmdb_movies_production_companies")
-      .insert(productionCompaniesRows);
-
-    if (production_companies_error) {
-      console.error(
-        `Error inserting tmdb_movies_production_companies junction table data: ${production_companies_error}`
-      );
-      return;
-    }
-
-    const castAndCrew = [
-      ...movieResponse.data.credits.cast,
-      ...movieResponse.data.credits.crew,
-    ];
-    const castAndCrewRows = castAndCrew.reduce((unique, person) => {
-      if (!unique.some((obj) => obj.id === person.id)) {
-        unique.push({
-          id: person.id,
-          gender:
-            person.gender === 0
-              ? "Not specified"
-              : person.gender === 1
-              ? "Female"
-              : person.gender === 2
-              ? "Male"
-              : person.gender === 3
-              ? "Non-binary"
-              : "Unknown",
-          known_for_department: person.known_for_department,
-          name: person.name,
-          original_name: person.original_name,
-          popularity: person.popularity,
-          profile_path: `https://image.tmdb.org/t/p/original${person.profile_path}`,
-        });
-      }
-      return unique;
-    }, []);
-
-    const { error: castAndCrewError } = await supabase
-      .from("tmdb_person")
-      .upsert(castAndCrewRows, {
-        onConflict: "id",
-        ignoreDuplicates: true,
-        defaultToNull: true,
-      });
-
-    if (castAndCrewError) {
-      console.error(
-        `Error inserting ${movieId} person data to tmdb_person: ${castAndCrewError}`
-      );
-      return;
-    }
-
-    const sortedCastByPopularity = movieResponse.data.credits.cast
-      .sort((a, b) => b.popularity - a.popularity)
-      .slice(0, 100);
-    const castRows = sortedCastByPopularity.map((cast) => ({
-      id: cast.credit_id,
-      person_id: cast.id,
-      movie_id: movieId,
-      character: cast.character,
-      order: cast.order,
-    }));
-
-    const { error: castError } = await supabase
-      .from("tmdb_cast")
-      .insert(castRows, {
-        onConflict: "id",
-        ignoreDuplicates: true,
-        defaultToNull: true,
-      });
-
-    if (castError) {
-      console.error(
-        `Error inserting ${movieId} cast data to tmdb_cast: ${castError}`
-      );
-      return;
-    }
-
-    const sortedCrewByPopularity = movieResponse.data.credits.crew
-      .sort((a, b) => b.popularity - a.popularity)
-      .slice(0, 100);
-    const crewRows = sortedCrewByPopularity.map((crew) => ({
-      id: crew.credit_id,
-      person_id: crew.id,
-      movie_id: movieId,
-      department: crew.department,
-      job: crew.job,
-    }));
-
-    const { error: crewError } = await supabase
-      .from("tmdb_crew")
-      .insert(crewRows, {
-        onConflict: "id",
-        ignoreDuplicates: true,
-        defaultToNull: true,
-      });
-
-    if (crewError) {
-      console.error(
-        `Error inserting ${movieId} crew data to tmdb_cast: ${crewError}`
       );
       return;
     }
