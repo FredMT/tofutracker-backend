@@ -12,27 +12,29 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
+const ANILIST_API_URL = "https://graphql.anilist.co";
 
-let animeListCache = []; // This will hold the anime list in memory
+let animeListCache = [];
+let animeMapTVDBIdCache = [];
 
-// Function to load the anime list from file
-async function loadAnimeList() {
+async function loadAnimeListAndMap() {
   try {
-    const data = await fs.readFile("anime-list.json", "utf8");
-    const animeList = JSON.parse(data)["anime-list"].anime;
-    animeListCache = animeList; // Store the anime list in the cache
-    console.log("Anime list loaded into cache.");
+    const animeListData = await fs.readFile("anime-list.json", "utf8");
+    const animeList = JSON.parse(animeListData)["anime-list"].anime;
+    animeListCache = animeList;
+
+    const animeMapTVDBIdData = await fs.readFile("anilist_tvdb.json", "utf8");
+    const animeMapTVDBId = JSON.parse(animeMapTVDBIdData);
+    animeMapTVDBIdCache = animeMapTVDBId;
   } catch (err) {
-    console.error("Error loading anime list from file:", err);
+    console.error("Error loading data from file:", err);
   }
 }
 
-// Load the anime list at application startup
-loadAnimeList();
+loadAnimeListAndMap();
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
-//To be changed as it makes a new request everytime
 app.get("/api/trending", async (req, res) => {
   try {
     const trendingResponse = await axios.get(
@@ -47,19 +49,18 @@ app.get("/api/trending", async (req, res) => {
           );
           const logos = imagesResponse.data.logos;
           if (logos && logos.length > 0) {
-            movie.logo_path = logos[0].file_path; // Append the first logo's file path
+            movie.logo_path = logos[0].file_path;
           }
           return movie;
         } catch (imageError) {
           console.error(
             `Error fetching images for movie ID ${movie.id}: ${imageError}`
           );
-          return movie; // Return the movie without a logo if the images request fails
+          return movie;
         }
       })
     );
 
-    // Replace the original results with the updated moviesWithLogos
     trendingResponse.data.results = moviesWithLogos;
     res.send(trendingResponse.data);
   } catch (error) {
@@ -74,7 +75,6 @@ app.get("/api/getmovie/:id", async (req, res) => {
   try {
     const movieId = req.params.id;
 
-    // First, check if the movie already exists in the Supabase database
     const { data: existingMovie, error: existingMovieError } = await supabase
       .from("tmdb_movies_json")
       .select("movies_data")
@@ -88,14 +88,12 @@ app.get("/api/getmovie/:id", async (req, res) => {
         .send("An error occurred while trying to fetch the movie data");
     }
 
-    // Return movie from database if it already exists
     if (existingMovie) {
       return res.json({
         ...existingMovie.movies_data,
       });
     }
 
-    // If the movie does not exist in the database, proceed with the TMDB API call
     const movieResponse = await axios.get(
       `https://api.themoviedb.org/3/movie/${movieId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits,keywords,images,similar,videos,watch/providers,release_dates,external_ids`
     );
@@ -135,7 +133,6 @@ app.get("/api/getmovie/:id", async (req, res) => {
           certification = usReleaseDates[0].release_dates[0].certification;
         }
 
-        // Create an array of objects for batch insertion
         const movieGenreRows = genres.map((genre) => ({
           movie_id: movieId,
           genre_id: genre.id,
@@ -185,12 +182,10 @@ app.get("/api/getmovie/:id", async (req, res) => {
           return;
         }
 
-        // Insert all genre rows in a single batch
         const { error: movies_genres_error } = await supabase
           .from("tmdb_movies_genres")
           .insert(movieGenreRows);
 
-        // Handle any errors
         if (movies_genres_error) {
           console.error(
             `Error inserting ${movieId} to tmdb_movies_genres junction table: ${movies_genres_error}`
@@ -198,7 +193,6 @@ app.get("/api/getmovie/:id", async (req, res) => {
           return;
         }
 
-        //Add movie response directly to supabase table with json data for denormalized data retrieval
         const { error: movieResponseError } = await supabase
           .from("tmdb_movies_json")
           .upsert({
@@ -376,6 +370,389 @@ app.get("/api/gettvseason/:id/:season_number", async (req, res) => {
           "An error occurred while trying to fetch the TV show season data"
         );
     }
+  }
+});
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchMediaData(mediaId, fetchedIds = new Set()) {
+  if (fetchedIds.has(mediaId)) {
+    return [];
+  }
+
+  fetchedIds.add(mediaId);
+
+  const query = `
+    query {
+      Media(id: ${mediaId}, type: ANIME) {
+        id
+        title {
+          userPreferred
+        }
+        type
+        relations {
+          edges {
+            node {
+              id
+              type
+              title {
+                userPreferred
+              }
+            }
+            relationType(version: 2)
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    if (fetchedIds.size >= 20) {
+      return [];
+    }
+
+    const response = await axios({
+      url: ANILIST_API_URL,
+      method: "post",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      data: JSON.stringify({ query }),
+    });
+
+    const mediaData = response.data.data.Media;
+    const currentMedia = {
+      id: mediaData.id,
+      title: mediaData.title.userPreferred,
+      type: mediaData.type,
+      prequelId:
+        mediaData.relations.edges.find(
+          (edge) => edge.relationType === "PREQUEL"
+        )?.node.id || null,
+      sequelId:
+        mediaData.relations.edges.find((edge) => edge.relationType === "SEQUEL")
+          ?.node.id || null,
+    };
+
+    const results = [currentMedia];
+
+    mediaData.relations.edges
+      .filter((edge) => edge.relationType === "SIDE_STORY")
+      .forEach((edge) => {
+        const sideStory = {
+          id: edge.node.id,
+          title: edge.node.title.userPreferred,
+          type: "SIDE STORY",
+        };
+        results.push(sideStory);
+      });
+
+    for (const edge of mediaData.relations.edges) {
+      if (fetchedIds.size >= 20) {
+        break;
+      }
+
+      const { relationType, node } = edge;
+      if (
+        (relationType === "PREQUEL" ||
+          relationType === "SEQUEL" ||
+          relationType === "SIDE_STORY") &&
+        !fetchedIds.has(node.id)
+      ) {
+        const relatedMediaData = await fetchMediaData(node.id, fetchedIds);
+        relatedMediaData.forEach((data) => {
+          if (!results.some((result) => result.id === data.id)) {
+            results.push(data);
+          }
+        });
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error("Error fetching media data:", error);
+    throw error;
+  }
+}
+
+app.get("/api/getanimeseasons/:id", async function (req, res) {
+  const animeId = req.params.id;
+
+  try {
+    let { data: existingAnime, error: fetchError } = await supabase
+      .from("anilist_anime_seasons")
+      .select("*")
+      .eq("id", animeId)
+      .single();
+
+    if (existingAnime) {
+      return res.status(200).json(existingAnime);
+    }
+
+    if (fetchError && fetchError.code !== "PGRST116") {
+      console.error("Error fetching existing anime data:", fetchError);
+      return res.status(500).json({
+        success: false,
+        message: "Internal Server Error while fetching existing anime data",
+      });
+    }
+    const mediaData = await fetchMediaData(animeId);
+
+    res.json(mediaData);
+    const { data, error } = await supabase
+      .from("anilist_anime")
+      .upsert(mediaData);
+    if (error) {
+      console.error("Error inserting anime data:", error);
+    }
+  } catch (error) {
+    console.error("Error in /api/getanime/:id", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/getanime/:id", async function (req, res) {
+  const animeId = parseInt(req.params.id);
+
+  const tvdbId = animeMapTVDBIdCache.find(
+    (item) => item.anilist_id === animeId
+  )?.thetvdb_id;
+  if (!tvdbId) {
+    return res.status(404).json({
+      error: `No matching TheTVDB ID found for AniList ID: ${animeId}`,
+    });
+  }
+
+  const response = await axios.get(
+    `https://api.themoviedb.org/3/find/${tvdbId}?external_source=tvdb_id&api_key=${process.env.TMDB_API_KEY}`
+  );
+  const tmdbId = response.data.tv_results[0].id;
+
+  try {
+    tmdbData = await axios.get(
+      `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=season/1,season/2,season/3,season/4,season/5,season/6,season/7,season/8,season/9,season/10,season/11,season/12,season/13,season/14,season/15,season/16,season/17,season/18,season/19`
+    );
+    const backdrop_path = tmdbData.data.backdrop_path
+      ? `https://image.tmdb.org/t/p/original${tmdbData.data.backdrop_path}`
+      : null;
+    const overview = tmdbData.data.overview ? tmdbData.data.overview : null;
+
+    const query = `
+    query {
+      Media(id: ${animeId}, type: ANIME) {
+        id
+        siteUrl
+        title {
+          romaji
+          english
+          native
+          userPreferred
+        }
+        format
+        status
+        description(asHtml: false)
+        startDate {
+          year
+          month
+          day
+        }
+        endDate {
+          year
+          month
+          day
+        }
+        season
+        seasonYear
+        seasonInt
+        episodes
+        duration
+        source(version: 2)
+        hashtag
+        coverImage {
+          extraLarge
+        }
+        trailer {
+          id
+          site
+          thumbnail
+        }
+        updatedAt
+        genres
+        averageScore
+        meanScore
+        popularity
+        characters(sort: [ROLE, RELEVANCE, ID]) {
+          edges {
+            node {
+              id
+              name {
+                full
+                native
+              }
+              image {
+                large
+                medium
+              }
+              description(asHtml: false)
+            }
+            role
+            voiceActors(language: JAPANESE) {
+              id
+              name {
+                full
+                native
+              }
+              image {
+                large
+                medium
+              }
+              languageV2
+            }
+          }
+        }
+        staff(sort: [RELEVANCE, ID]) {
+          edges {
+            node {
+              id
+              name {
+                full
+                native
+              }
+              image {
+                large
+                medium
+              }
+              description(asHtml: false)
+            }
+            role
+          }
+        }
+        studios {
+          edges {
+            isMain
+            node {
+              id
+              name
+              siteUrl
+            }
+          }
+        }
+        nextAiringEpisode {
+          airingAt
+          timeUntilAiring
+          episode
+        }
+        airingSchedule {
+          edges {
+            node {
+              airingAt
+              timeUntilAiring
+              episode
+            }
+          }
+        }
+        externalLinks {
+          id
+          url
+          site
+        }
+        streamingEpisodes {
+          title
+          thumbnail
+          url
+          site
+        }
+        recommendations {
+          edges {
+            node {
+              mediaRecommendation {
+                id
+                averageScore
+                title {
+                  userPreferred
+                }
+                type
+                format
+                status
+                coverImage {
+                  extraLarge
+                }
+              }
+            }
+          }
+        }
+      }
+    }`;
+
+    let mediaData;
+    try {
+      const response = await axios({
+        url: ANILIST_API_URL,
+        method: "post",
+        data: {
+          query: query,
+        },
+      });
+      mediaData = response.data;
+    } catch (error) {
+      console.error("Error fetching media data with axios:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal Server Error while fetching media data",
+      });
+    }
+
+    mediaData = mediaData.data.Media;
+
+    let filteredEpisodes = [];
+    for (let i = 1; i <= 19; i++) {
+      if (
+        tmdbData.data[`season/${i}`] &&
+        tmdbData.data[`season/${i}`].episodes
+      ) {
+        tmdbData.data[`season/${i}`].episodes.forEach((episode) => {
+          let airDate = new Date(episode.air_date);
+          if (
+            airDate >=
+              new Date(
+                mediaData.startDate.year,
+                mediaData.startDate.month - 1,
+                mediaData.startDate.day - 1
+              ) &&
+            airDate <=
+              new Date(
+                mediaData.endDate.year,
+                mediaData.endDate.month - 1,
+                mediaData.endDate.day + 1
+              )
+          ) {
+            filteredEpisodes.push({
+              air_date: episode.air_date,
+              episode_number: episode.episode_number,
+              name: episode.name,
+              overview: episode.overview,
+              runtime: episode.runtime,
+              still_path: episode.still_path
+                ? `https://image.tmdb.org/t/p/original${episode.still_path}`
+                : null,
+            });
+          }
+        });
+      }
+    }
+    tmdbData.data = filteredEpisodes;
+    res.json({
+      mediaData: mediaData,
+      tmdbData: tmdbData.data,
+      backdrop_path: backdrop_path,
+      overview: overview,
+    });
+  } catch (error) {
+    console.error("Error in /api/getanime/:id", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
