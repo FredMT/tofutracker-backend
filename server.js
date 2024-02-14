@@ -517,6 +517,15 @@ app.get("/api/getanimeseasons/:id", async function (req, res) {
 app.get("/api/getanime/:id", async function (req, res) {
   const animeId = parseInt(req.params.id);
 
+  const tvdbId = animeMapTVDBIdCache.find(
+    (item) => item.anilist_id === animeId
+  )?.thetvdb_id;
+  if (!tvdbId) {
+    return res.status(404).json({
+      error: `No matching TheTVDB ID found for AniList ID: ${animeId}`,
+    });
+  }
+
   const animeData = await fetchMediaData(animeId);
   const { error } = await supabase
     .from("anilist_anime_seasons")
@@ -542,15 +551,6 @@ app.get("/api/getanime/:id", async function (req, res) {
     return res.status(500).json({
       success: false,
       message: "Internal Server Error while fetching anime chain",
-    });
-  }
-
-  const tvdbId = animeMapTVDBIdCache.find(
-    (item) => item.anilist_id === animeId
-  )?.thetvdb_id;
-  if (!tvdbId) {
-    return res.status(404).json({
-      error: `No matching TheTVDB ID found for AniList ID: ${animeId}`,
     });
   }
 
