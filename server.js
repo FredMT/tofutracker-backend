@@ -561,12 +561,22 @@ app.get("/api/getanime/:id", async function (req, res) {
 
   try {
     tmdbData = await axios.get(
-      `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=season/1,season/2,season/3,season/4,season/5,season/6,season/7,season/8,season/9,season/10,season/11,season/12,season/13,season/14,season/15,season/16,season/17,season/18,season/19`
+      `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=season/1,season/2,season/3,season/4,season/5,season/6,season/7,season/8,season/9,season/10,season/11,season/12,season/13,season/14,season/15,season/16,season/17,season/18,images`
     );
     const backdrop_path = tmdbData.data.backdrop_path
       ? `https://image.tmdb.org/t/p/original${tmdbData.data.backdrop_path}`
       : null;
     const overview = tmdbData.data.overview ? tmdbData.data.overview : null;
+    let highestVotedLogo;
+    if (tmdbData.data.images.logos.length > 0) {
+      highestVotedLogo = tmdbData.data.images.logos.reduce(
+        (max, logo) => (logo.vote_count > max.vote_count ? logo : max),
+        tmdbData.data.images.logos[0]
+      );
+    }
+    const logo = highestVotedLogo
+      ? `https://image.tmdb.org/t/p/original${highestVotedLogo.file_path}`
+      : null;
 
     const query = `
     query {
@@ -776,6 +786,7 @@ app.get("/api/getanime/:id", async function (req, res) {
       mediaData: mediaData,
       tmdbData: tmdbData.data,
       backdrop_path: backdrop_path,
+      logo: logo,
       overview: overview,
       animeChainData: animeChainData,
     });
