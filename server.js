@@ -786,6 +786,7 @@ app.get("/api/getanime/:id", async function (req, res) {
       mediaData: mediaData,
       tmdbData: tmdbData.data,
       backdrop_path: backdrop_path,
+      genres: mediaData.genres,
       logo: logo,
       overview: overview,
       animeChainData: animeChainData,
