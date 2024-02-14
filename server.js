@@ -503,7 +503,7 @@ app.get("/api/getanimeseasons/:id", async function (req, res) {
 
     res.json(mediaData);
     const { data, error } = await supabase
-      .from("anilist_anime")
+      .from("anilist_anime_seasons")
       .upsert(mediaData);
     if (error) {
       console.error("Error inserting anime data:", error);
@@ -516,6 +516,34 @@ app.get("/api/getanimeseasons/:id", async function (req, res) {
 
 app.get("/api/getanime/:id", async function (req, res) {
   const animeId = parseInt(req.params.id);
+
+  const animeData = await fetchMediaData(animeId);
+  const { error } = await supabase
+    .from("anilist_anime_seasons")
+    .upsert(animeData);
+
+  if (error) {
+    console.error("Error inserting anime data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error while inserting anime data",
+    });
+  }
+
+  const { data: animeChainData, error: animeChainError } = await supabase.rpc(
+    "get_anime_chain",
+    {
+      anime_id: animeId,
+    }
+  );
+
+  if (animeChainError) {
+    console.error("Error fetching anime chain:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error while fetching anime chain",
+    });
+  }
 
   const tvdbId = animeMapTVDBIdCache.find(
     (item) => item.anilist_id === animeId
@@ -720,13 +748,13 @@ app.get("/api/getanime/:id", async function (req, res) {
               new Date(
                 mediaData.startDate.year,
                 mediaData.startDate.month - 1,
-                mediaData.startDate.day - 1
+                mediaData.startDate.day - 10
               ) &&
             airDate <=
               new Date(
                 mediaData.endDate.year,
                 mediaData.endDate.month - 1,
-                mediaData.endDate.day + 1
+                mediaData.endDate.day + 10
               )
           ) {
             filteredEpisodes.push({
@@ -749,6 +777,7 @@ app.get("/api/getanime/:id", async function (req, res) {
       tmdbData: tmdbData.data,
       backdrop_path: backdrop_path,
       overview: overview,
+      animeChainData: animeChainData,
     });
   } catch (error) {
     console.error("Error in /api/getanime/:id", error);
