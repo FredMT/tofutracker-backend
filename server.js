@@ -392,6 +392,12 @@ async function fetchMediaData(mediaId, fetchedIds = new Set()) {
           userPreferred
         }
         type
+        season
+        seasonYear
+        episodes
+        duration
+        source
+        averageScore
         relations {
           edges {
             node {
@@ -428,6 +434,12 @@ async function fetchMediaData(mediaId, fetchedIds = new Set()) {
       id: mediaData.id,
       title: mediaData.title.userPreferred,
       type: mediaData.type,
+      season: mediaData.season,
+      seasonYear: mediaData.seasonYear,
+      episodes: mediaData.episodes,
+      duration: mediaData.duration,
+      source: mediaData.source,
+      averageScore: mediaData.averageScore / 10,
       prequelId:
         mediaData.relations.edges.find(
           (edge) => edge.relationType === "PREQUEL"
@@ -703,7 +715,7 @@ app.get("/api/getanime/:id", async function (req, res) {
           url
           site
         }
-        recommendations {
+        recommendations (sort:RATING_DESC) {
           edges {
             node {
               mediaRecommendation {
@@ -712,6 +724,8 @@ app.get("/api/getanime/:id", async function (req, res) {
                 title {
                   userPreferred
                 }
+                season
+                seasonYear
                 type
                 format
                 status
@@ -786,8 +800,73 @@ app.get("/api/getanime/:id", async function (req, res) {
       mediaData: mediaData,
       tmdbData: tmdbData.data,
       backdrop_path: backdrop_path,
+      poster_path: mediaData.coverImage.extraLarge,
       genres: mediaData.genres,
       logo: logo,
+      original_name: mediaData.title.userPreferred,
+      runtime: mediaData.duration,
+      status: mediaData.status,
+      seasons: animeChainData.length,
+      episodes: animeChainData.reduce(function (total, anime) {
+        return total + (anime.episodes ? anime.episodes : 0);
+      }, 0),
+      credits: {
+        crew: mediaData.staff.edges
+          .filter(function (edge) {
+            return [
+              "Director",
+              "Assistant Director",
+              "Character Design",
+              "Main Animator",
+              "Art Design",
+            ].includes(edge.role);
+          })
+          .map(function (edge) {
+            return {
+              role: edge.role,
+              name: edge.node.name.full,
+            };
+          }),
+        cast: mediaData.characters.edges.map(function (edge) {
+          return {
+            character: {
+              characterId: edge.node.id,
+              name: edge.node.name.full,
+              image: edge.node.image.large,
+              description: edge.node.description,
+            },
+            voiceActors: edge.voiceActors.map(function (va) {
+              return {
+                id: va.id,
+                name: va.name.full,
+                image: va.image.large,
+                language: va.languageV2,
+              };
+            }),
+          };
+        }),
+      },
+      recommendations: mediaData.recommendations.edges.map(function (edge) {
+        return {
+          id: edge.node.mediaRecommendation.id,
+          original_name: edge.node.mediaRecommendation.title.userPreferred,
+          poster_path: edge.node.mediaRecommendation.coverImage.extraLarge,
+          release_date:
+            edge.node.mediaRecommendation.season +
+            edge.node.mediaRecommendation.seasonYear,
+          vote_average: edge.node.mediaRecommendation.averageScore / 10,
+        };
+      }),
+
+      created_by: mediaData.staff.edges.find(
+        (edge) =>
+          edge.role === "Original Story" || edge.role === "Original Creator"
+      )?.node.name.full,
+      release_date: mediaData.seasonYear,
+      vote_average: mediaData.averageScore / 10,
+      networks: mediaData.studios.edges.find(function (edge) {
+        return edge.isMain === true;
+      }).node.name,
       overview: overview,
       animeChainData: animeChainData,
     });
