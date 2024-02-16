@@ -783,6 +783,7 @@ app.get("/api/getanime/:id", async function (req, res) {
 
     mediaData = mediaData.data.Media;
     res.json({
+      id: mediaData.id,
       tmdbId,
       animeChainData,
       mediaData,
