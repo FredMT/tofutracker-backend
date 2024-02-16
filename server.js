@@ -373,10 +373,6 @@ app.get("/api/gettvseason/:id/:season_number", async (req, res) => {
   }
 });
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function fetchMediaData(mediaId, fetchedIds = new Set()) {
   if (fetchedIds.has(mediaId)) {
     return [];
@@ -490,41 +486,77 @@ async function fetchMediaData(mediaId, fetchedIds = new Set()) {
   }
 }
 
-app.get("/api/getanimeseasons/:id", async function (req, res) {
-  const animeId = req.params.id;
-
+async function getAnimeChainData(animeID, tmdbId) {
   try {
-    let { data: existingAnime, error: fetchError } = await supabase
+    let animeChainData;
+    // Check if animeID already exists in the database
+    let { data: existingAnime, error: existingAnimeError } = await supabase
       .from("anilist_anime_seasons")
-      .select("*")
-      .eq("id", animeId)
+      .select("id, tmdb_id")
+      .eq("id", animeID)
       .single();
 
+    if (existingAnimeError) {
+      // If animeID does not exist, fetch data and upsert into database
+      let fetchedAnimeData = await fetchMediaData(animeID);
+
+      let { error: upsertError } = await supabase
+        .from("anilist_anime_seasons")
+        .upsert(fetchedAnimeData);
+
+      if (upsertError) {
+        console.error("Error upserting anime data:", upsertError);
+        throw upsertError;
+      }
+
+      // Order the newly inserted data
+      const { error: orderError } = await supabase.rpc(
+        "update_anime_chain_order",
+        {
+          anime_id: animeID,
+          t_tmdbid: tmdbId,
+        }
+      );
+
+      if (orderError) {
+        console.error("Error ordering anime chain:", orderError);
+        throw orderError;
+      }
+
+      let { data: relatedAnimeData, error: relatedAnimeError } = await supabase
+        .from("anilist_anime_seasons")
+        .select("*")
+        .eq("tmdb_id", tmdbId);
+
+      if (relatedAnimeError) {
+        console.error("Error fetching related anime data:", relatedAnimeError);
+        throw relatedAnimeError;
+      }
+
+      animeChainData = relatedAnimeData;
+      return animeChainData;
+    }
+
     if (existingAnime) {
-      return res.status(200).json(existingAnime);
-    }
+      // If animeID exists, find all rows with the same tmdb_id
+      let { data: relatedAnimeData, error: relatedAnimeError } = await supabase
+        .from("anilist_anime_seasons")
+        .select("*")
+        .eq("tmdb_id", existingAnime.tmdb_id);
 
-    if (fetchError && fetchError.code !== "PGRST116") {
-      console.error("Error fetching existing anime data:", fetchError);
-      return res.status(500).json({
-        success: false,
-        message: "Internal Server Error while fetching existing anime data",
-      });
-    }
-    const mediaData = await fetchMediaData(animeId);
+      if (relatedAnimeError) {
+        console.error("Error fetching related anime data:", relatedAnimeError);
+        throw relatedAnimeError;
+      }
 
-    res.json(mediaData);
-    const { data, error } = await supabase
-      .from("anilist_anime_seasons")
-      .upsert(mediaData);
-    if (error) {
-      console.error("Error inserting anime data:", error);
+      animeChainData = relatedAnimeData;
+      return animeChainData;
     }
   } catch (error) {
-    console.error("Error in /api/getanime/:id", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    console.error("Error in getAnimeChainData:", error);
+    throw error;
   }
-});
+}
 
 app.get("/api/getanime/:id", async function (req, res) {
   const animeId = parseInt(req.params.id);
@@ -538,38 +570,12 @@ app.get("/api/getanime/:id", async function (req, res) {
     });
   }
 
-  const animeData = await fetchMediaData(animeId);
-  const { error } = await supabase
-    .from("anilist_anime_seasons")
-    .upsert(animeData);
-
-  if (error) {
-    console.error("Error inserting anime data:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error while inserting anime data",
-    });
-  }
-
-  const { data: animeChainData, error: animeChainError } = await supabase.rpc(
-    "get_anime_chain",
-    {
-      anime_id: animeId,
-    }
-  );
-
-  if (animeChainError) {
-    console.error("Error fetching anime chain:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error while fetching anime chain",
-    });
-  }
-
   const response = await axios.get(
     `https://api.themoviedb.org/3/find/${tvdbId}?external_source=tvdb_id&api_key=${process.env.TMDB_API_KEY}`
   );
   const tmdbId = response.data.tv_results[0].id;
+
+  const animeChainData = await getAnimeChainData(animeId, tmdbId);
 
   try {
     tmdbData = await axios.get(
@@ -578,13 +584,30 @@ app.get("/api/getanime/:id", async function (req, res) {
     const backdrop_path = tmdbData.data.backdrop_path
       ? `https://image.tmdb.org/t/p/original${tmdbData.data.backdrop_path}`
       : null;
-    const overview = tmdbData.data.overview ? tmdbData.data.overview : null;
     let highestVotedLogo;
     if (tmdbData.data.images.logos.length > 0) {
-      highestVotedLogo = tmdbData.data.images.logos.reduce(
-        (max, logo) => (logo.vote_count > max.vote_count ? logo : max),
-        tmdbData.data.images.logos[0]
-      );
+      highestVotedLogo = tmdbData.data.images.logos.reduce((max, logo) => {
+        if (
+          logo.iso_639_1 === "en" &&
+          (!max.iso_639_1 ||
+            max.iso_639_1 !== "en" ||
+            logo.vote_count > max.vote_count)
+        ) {
+          return logo;
+        } else if (!max.iso_639_1 || max.iso_639_1 !== "en") {
+          if (
+            logo.iso_639_1 === "ja" &&
+            (!max.iso_639_1 ||
+              max.iso_639_1 !== "ja" ||
+              logo.vote_count > max.vote_count)
+          ) {
+            return logo;
+          } else if (!max.iso_639_1 || logo.vote_count > max.vote_count) {
+            return logo;
+          }
+        }
+        return max;
+      }, tmdbData.data.images.logos[0]);
     }
     const logo = highestVotedLogo
       ? `https://image.tmdb.org/t/p/original${highestVotedLogo.file_path}`
@@ -725,6 +748,7 @@ app.get("/api/getanime/:id", async function (req, res) {
                   userPreferred
                 }
                 season
+                popularity
                 seasonYear
                 type
                 format
@@ -758,52 +782,16 @@ app.get("/api/getanime/:id", async function (req, res) {
     }
 
     mediaData = mediaData.data.Media;
-
-    let filteredEpisodes = [];
-    for (let i = 1; i <= 19; i++) {
-      if (
-        tmdbData.data[`season/${i}`] &&
-        tmdbData.data[`season/${i}`].episodes
-      ) {
-        tmdbData.data[`season/${i}`].episodes.forEach((episode) => {
-          let airDate = new Date(episode.air_date);
-          if (
-            airDate >=
-              new Date(
-                mediaData.startDate.year,
-                mediaData.startDate.month - 1,
-                mediaData.startDate.day - 10
-              ) &&
-            airDate <=
-              new Date(
-                mediaData.endDate.year,
-                mediaData.endDate.month - 1,
-                mediaData.endDate.day + 10
-              )
-          ) {
-            filteredEpisodes.push({
-              air_date: episode.air_date,
-              episode_number: episode.episode_number,
-              name: episode.name,
-              overview: episode.overview,
-              runtime: episode.runtime,
-              still_path: episode.still_path
-                ? `https://image.tmdb.org/t/p/original${episode.still_path}`
-                : null,
-            });
-          }
-        });
-      }
-    }
-    tmdbData.data = filteredEpisodes;
     res.json({
-      mediaData: mediaData,
-      tmdbData: tmdbData.data,
-      backdrop_path: backdrop_path,
+      mediaData,
+      backdrop_path,
       poster_path: mediaData.coverImage.extraLarge,
       genres: mediaData.genres,
-      logo: logo,
+      logo,
       original_name: mediaData.title.userPreferred,
+      romaji: mediaData.title.romaji,
+      english: mediaData.title.english,
+      native: mediaData.title.native,
       runtime: mediaData.duration,
       status: mediaData.status,
       seasons: animeChainData.length,
@@ -833,7 +821,7 @@ app.get("/api/getanime/:id", async function (req, res) {
               characterId: edge.node.id,
               name: edge.node.name.full,
               image: edge.node.image.large,
-              description: edge.node.description,
+              role: edge.role,
             },
             voiceActors: edge.voiceActors.map(function (va) {
               return {
@@ -841,38 +829,181 @@ app.get("/api/getanime/:id", async function (req, res) {
                 name: va.name.full,
                 image: va.image.large,
                 language: va.languageV2,
+                role: edge.role,
               };
             }),
           };
         }),
       },
-      recommendations: mediaData.recommendations.edges.map(function (edge) {
-        return {
-          id: edge.node.mediaRecommendation.id,
-          original_name: edge.node.mediaRecommendation.title.userPreferred,
-          poster_path: edge.node.mediaRecommendation.coverImage.extraLarge,
-          release_date:
-            edge.node.mediaRecommendation.season +
-            edge.node.mediaRecommendation.seasonYear,
-          vote_average: edge.node.mediaRecommendation.averageScore / 10,
-        };
-      }),
-
+      recommendations: {
+        results: mediaData.recommendations.edges.map(function (edge) {
+          return {
+            id: edge.node.mediaRecommendation.id,
+            original_name: edge.node.mediaRecommendation.title.userPreferred,
+            poster_path: edge.node.mediaRecommendation.coverImage.extraLarge,
+            popularity: edge.node.mediaRecommendation.popularity,
+            release_date: `${edge.node.mediaRecommendation.season} ${edge.node.mediaRecommendation.seasonYear}`,
+            vote_average: edge.node.mediaRecommendation.averageScore / 10,
+          };
+        }),
+      },
+      producers: mediaData.studios.edges
+        .filter(function (edge) {
+          return edge.isMain === false;
+        })
+        .map(function (edge) {
+          return edge.node.name;
+        }),
       created_by: mediaData.staff.edges.find(
         (edge) =>
           edge.role === "Original Story" || edge.role === "Original Creator"
       )?.node.name.full,
-      release_date: mediaData.seasonYear,
+      release_date: `${mediaData.season} ${mediaData.seasonYear}`,
       vote_average: mediaData.averageScore / 10,
+      format: mediaData.format,
       networks: mediaData.studios.edges.find(function (edge) {
         return edge.isMain === true;
       }).node.name,
-      overview: overview,
-      animeChainData: animeChainData,
+      overview: mediaData.description,
+      hashtag: mediaData.hashtag,
+      website: mediaData.siteUrl,
     });
   } catch (error) {
     console.error("Error in /api/getanime/:id", error);
     res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/getanimebackdrops/:id", async function (req, res) {
+  const animeId = req.params.id;
+
+  try {
+    const response = await axios.get(
+      `https://api.themoviedb.org/3/tv/${animeId}/images?api_key=${process.env.TMDB_API_KEY}`
+    );
+    const backdrops = response.data.backdrops;
+
+    if (backdrops) {
+      return res.status(200).send(backdrops);
+    }
+  } catch (error) {
+    console.error("Error in /api/getanimebackdrops/:id", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/getanimeepisodes/:id", async function (req, res) {
+  const animeId = parseInt(req.params.id);
+
+  const { data, error } = await supabase
+    .from("anilist_anime_episodes")
+    .select("*")
+    .eq("anime_id", animeId);
+
+  if (data.length > 0) {
+    return res.status(200).json(data);
+  }
+
+  if (error) {
+    return res.status(500).json({ message: "Internal Server Error", error });
+  }
+
+  const { data: tmdbIdData } = await supabase
+    .from("anilist_anime_seasons")
+    .select("tmdb_id")
+    .eq("id", animeId)
+    .single();
+
+  const tmdbId = tmdbIdData.tmdb_id;
+
+  try {
+    tmdbData = await axios.get(
+      `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=season/1,season/2,season/3,season/4,season/5,season/6,season/7,season/8,season/9,season/10,season/11,season/12,season/13,season/14,season/15,season/16,season/17,season/18,season/19`
+    );
+
+    let mediaData;
+    try {
+      const mediaQuery = `
+        query {
+          Media(id: ${animeId}, type: ANIME) {
+            startDate {
+              year
+              month
+              day
+            }
+            endDate {
+              year
+              month
+              day
+            }
+          }
+        }`;
+
+      const mediaResponse = await axios({
+        url: ANILIST_API_URL,
+        method: "post",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        data: JSON.stringify({ query: mediaQuery }),
+      });
+
+      mediaData = mediaResponse.data.data.Media;
+    } catch (error) {
+      res.status(500).json({ message: "Internal Server Error", error });
+    }
+
+    const filteredEpisodes = [];
+    for (let i = 1; i <= 19; i++) {
+      if (
+        tmdbData.data[`season/${i}`] &&
+        tmdbData.data[`season/${i}`].episodes
+      ) {
+        tmdbData.data[`season/${i}`].episodes.forEach((episode) => {
+          let airDate = new Date(episode.air_date);
+          if (
+            airDate >=
+              new Date(
+                mediaData.startDate.year,
+                mediaData.startDate.month - 1,
+                mediaData.startDate.day - 10
+              ) &&
+            airDate <=
+              new Date(
+                mediaData.endDate.year,
+                mediaData.endDate.month - 1,
+                mediaData.endDate.day + 10
+              )
+          ) {
+            filteredEpisodes.push({
+              id: episode.id,
+              anime_id: animeId,
+              air_date: episode.air_date,
+              number: episode.episode_number,
+              name: episode.name,
+              overview: episode.overview,
+              runtime: episode.runtime,
+              still_path: episode.still_path
+                ? `https://image.tmdb.org/t/p/original${episode.still_path}`
+                : null,
+            });
+          }
+        });
+      }
+    }
+
+    res.json(filteredEpisodes);
+
+    const { error } = await supabase
+      .from("anilist_anime_episodes")
+      .insert(filteredEpisodes);
+
+    if (error) {
+      console.error("Error inserting anime episodes:", error);
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
   }
 });
 
