@@ -783,6 +783,8 @@ app.get("/api/getanime/:id", async function (req, res) {
 
     mediaData = mediaData.data.Media;
     res.json({
+      tmdbId,
+      animeChainData,
       mediaData,
       backdrop_path,
       poster_path: mediaData.coverImage.extraLarge,
