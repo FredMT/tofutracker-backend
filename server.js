@@ -465,9 +465,7 @@ async function fetchMediaData(mediaId, fetchedIds = new Set()) {
 
       const { relationType, node } = edge;
       if (
-        (relationType === "PREQUEL" ||
-          relationType === "SEQUEL" ||
-          relationType === "SIDE_STORY") &&
+        (relationType === "PREQUEL" || relationType === "SEQUEL") &&
         !fetchedIds.has(node.id)
       ) {
         const relatedMediaData = await fetchMediaData(node.id, fetchedIds);
@@ -489,7 +487,6 @@ async function fetchMediaData(mediaId, fetchedIds = new Set()) {
 async function getAnimeChainData(animeID, tmdbId) {
   try {
     let animeChainData;
-    // Check if animeID already exists in the database
     let { data: existingAnime, error: existingAnimeError } = await supabase
       .from("anilist_anime_seasons")
       .select("id, tmdb_id")
@@ -497,7 +494,6 @@ async function getAnimeChainData(animeID, tmdbId) {
       .single();
 
     if (existingAnimeError) {
-      // If animeID does not exist, fetch data and upsert into database
       let fetchedAnimeData = await fetchMediaData(animeID);
 
       let { error: upsertError } = await supabase
@@ -509,7 +505,6 @@ async function getAnimeChainData(animeID, tmdbId) {
         throw upsertError;
       }
 
-      // Order the newly inserted data
       const { error: orderError } = await supabase.rpc(
         "update_anime_chain_order",
         {
@@ -538,7 +533,6 @@ async function getAnimeChainData(animeID, tmdbId) {
     }
 
     if (existingAnime) {
-      // If animeID exists, find all rows with the same tmdb_id
       let { data: relatedAnimeData, error: relatedAnimeError } = await supabase
         .from("anilist_anime_seasons")
         .select("*")
@@ -559,60 +553,10 @@ async function getAnimeChainData(animeID, tmdbId) {
 }
 
 app.get("/api/getanime/:id", async function (req, res) {
-  const animeId = parseInt(req.params.id);
-
-  const tvdbId = animeMapTVDBIdCache.find(
-    (item) => item.anilist_id === animeId
-  )?.thetvdb_id;
-  if (!tvdbId) {
-    return res.status(404).json({
-      error: `No matching TheTVDB ID found for AniList ID: ${animeId}`,
-    });
-  }
-
-  const response = await axios.get(
-    `https://api.themoviedb.org/3/find/${tvdbId}?external_source=tvdb_id&api_key=${process.env.TMDB_API_KEY}`
-  );
-  const tmdbId = response.data.tv_results[0].id;
-
-  const animeChainData = await getAnimeChainData(animeId, tmdbId);
+  const animeId = req.params.id;
+  let mediaData;
 
   try {
-    tmdbData = await axios.get(
-      `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=season/1,season/2,season/3,season/4,season/5,season/6,season/7,season/8,season/9,season/10,season/11,season/12,season/13,season/14,season/15,season/16,season/17,season/18,images`
-    );
-    const backdrop_path = tmdbData.data.backdrop_path
-      ? `https://image.tmdb.org/t/p/original${tmdbData.data.backdrop_path}`
-      : null;
-    let highestVotedLogo;
-    if (tmdbData.data.images.logos.length > 0) {
-      highestVotedLogo = tmdbData.data.images.logos.reduce((max, logo) => {
-        if (
-          logo.iso_639_1 === "en" &&
-          (!max.iso_639_1 ||
-            max.iso_639_1 !== "en" ||
-            logo.vote_count > max.vote_count)
-        ) {
-          return logo;
-        } else if (!max.iso_639_1 || max.iso_639_1 !== "en") {
-          if (
-            logo.iso_639_1 === "ja" &&
-            (!max.iso_639_1 ||
-              max.iso_639_1 !== "ja" ||
-              logo.vote_count > max.vote_count)
-          ) {
-            return logo;
-          } else if (!max.iso_639_1 || logo.vote_count > max.vote_count) {
-            return logo;
-          }
-        }
-        return max;
-      }, tmdbData.data.images.logos[0]);
-    }
-    const logo = highestVotedLogo
-      ? `https://image.tmdb.org/t/p/original${highestVotedLogo.file_path}`
-      : null;
-
     const query = `
     query {
       Media(id: ${animeId}, type: ANIME) {
@@ -644,6 +588,7 @@ app.get("/api/getanime/:id", async function (req, res) {
         duration
         source(version: 2)
         hashtag
+        bannerImage
         coverImage {
           extraLarge
         }
@@ -765,7 +710,6 @@ app.get("/api/getanime/:id", async function (req, res) {
       }
     }`;
 
-    let mediaData;
     try {
       const response = await axios({
         url: ANILIST_API_URL,
@@ -774,21 +718,203 @@ app.get("/api/getanime/:id", async function (req, res) {
           query: query,
         },
       });
-      mediaData = response.data;
+      mediaData = response.data.data.Media;
     } catch (error) {
-      console.error("Error fetching media data with axios:", error);
       return res.status(500).json({
-        success: false,
         message: "Internal Server Error while fetching media data",
+        error: error.config,
       });
     }
+  } catch (error) {
+    console.error("Error in /api/getanime/:id", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
 
-    mediaData = mediaData.data.Media;
+  const cacheEntry = animeMapTVDBIdCache.find(
+    (item) => item.anilist_id === parseInt(animeId)
+  );
+  let isMovie = false;
+  const tvdbId = cacheEntry?.thetvdb_id;
+  let tmdbId = cacheEntry?.themoviedb_id;
+  if (tmdbId) {
+    isMovie = true;
+  }
+
+  if (!tvdbId && !tmdbId) {
+    return res.status(200).json({
+      id: mediaData.id,
+      external_links: mediaData.externalLinks,
+      poster_path: mediaData.coverImage?.extraLarge,
+      genres: mediaData.genres,
+      original_name: mediaData.title?.userPreferred,
+      romaji: mediaData.title?.romaji,
+      english: mediaData.title?.english,
+      native: mediaData.title?.native,
+      runtime: mediaData.duration,
+      status: mediaData.status,
+      credits: {
+        crew: mediaData.staff?.edges
+          ?.filter(function (edge) {
+            return [
+              "Director",
+              "Assistant Director",
+              "Character Design",
+              "Main Animator",
+              "Art Design",
+            ].includes(edge.role);
+          })
+          .map(function (edge) {
+            return {
+              role: edge.role,
+              name: edge.node.name.full,
+            };
+          }),
+        cast: mediaData.characters?.edges?.map(function (edge) {
+          return {
+            character: {
+              characterId: edge?.node?.id,
+              name: edge?.node?.name?.full,
+              image: edge?.node?.image?.large,
+              role: edge?.role,
+            },
+            voiceActors: edge.voiceActors.map(function (va) {
+              return {
+                id: va?.id,
+                name: va?.name?.full,
+                image: va?.image?.large,
+                language: va?.languageV2,
+                role: edge?.role,
+              };
+            }),
+          };
+        }),
+      },
+      recommendations: {
+        results: mediaData.recommendations?.edges?.map(function (edge) {
+          return {
+            id: edge?.node?.mediaRecommendation?.id,
+            original_name:
+              edge?.node?.mediaRecommendation?.title?.userPreferred,
+            poster_path:
+              edge?.node?.mediaRecommendation?.coverImage?.extraLarge,
+            popularity: edge?.node?.mediaRecommendation?.popularity,
+            release_date: `${edge?.node?.mediaRecommendation?.season} ${edge?.node?.mediaRecommendation?.seasonYear}`,
+            vote_average: edge?.node?.mediaRecommendation?.averageScore / 10,
+          };
+        }),
+      },
+      producers: mediaData.studios?.edges
+        ?.filter(function (edge) {
+          return edge?.isMain === false;
+        })
+        .map(function (edge) {
+          return edge?.node?.name;
+        }),
+      created_by: mediaData.staff?.edges?.find(
+        (edge) =>
+          edge?.role === "Original Story" || edge?.role === "Original Creator"
+      )?.node?.name?.full,
+      release_date: `${mediaData.season} ${mediaData.seasonYear}`,
+      vote_average: mediaData.averageScore / 10,
+      format: mediaData.format,
+      networks: mediaData.studios?.edges?.find(function (edge) {
+        return edge?.isMain === true;
+      })?.node?.name,
+      bannerImage: mediaData.bannerImage,
+      overview: mediaData.description,
+      hashtag: mediaData.hashtag,
+      website: mediaData.siteUrl,
+      streamingEpisodes: mediaData.streamingEpisodes,
+      error: `No matching TheTVDB ID or TheMovieDB ID found for AniList ID: ${animeId}`,
+    });
+  }
+
+  if (!isMovie) {
+    const response = await axios.get(
+      `https://api.themoviedb.org/3/find/${tvdbId}?external_source=tvdb_id&api_key=${process.env.TMDB_API_KEY}`
+    );
+    tmdbId = response.data.tv_results[0].id;
+  }
+
+  const animeChainData = await getAnimeChainData(animeId, tmdbId);
+  let backdrop_path;
+  let highestVotedLogo;
+  let logo;
+  let tmdbData;
+  try {
+    if (isMovie) {
+      try {
+        tmdbData = await axios.get(
+          `https://api.themoviedb.org/3/movie/${tmdbId}/images?api_key=${process.env.TMDB_API_KEY}`
+        );
+        backdrop_path = tmdbData.data.backdrops[0].file_path;
+        const enLogos = tmdbData.data.logos.filter(
+          (logo) => logo.iso_639_1 === "en"
+        );
+        const jaLogos = tmdbData.data.logos.filter(
+          (logo) => logo.iso_639_1 === "ja"
+        );
+        let selectedLogo;
+        if (enLogos.length > 0) {
+          selectedLogo = enLogos.reduce((prev, current) =>
+            prev.vote_count > current.vote_count ? prev : current
+          );
+        } else if (jaLogos.length > 0) {
+          selectedLogo = jaLogos[0];
+        } else {
+          selectedLogo = tmdbData.data.logos[0];
+        }
+        logo = selectedLogo
+          ? `https://image.tmdb.org/t/p/original${selectedLogo.file_path}`
+          : null;
+      } catch (error) {
+        res.status(500).json({ message: "Internal Server Error", error });
+      }
+    } else {
+      try {
+        tmdbData = await axios.get(
+          `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=season/1,season/2,season/3,season/4,season/5,season/6,season/7,season/8,season/9,season/10,season/11,season/12,season/13,season/14,season/15,season/16,season/17,season/18,images`
+        );
+
+        backdrop_path = tmdbData.data.backdrop_path
+          ? `https://image.tmdb.org/t/p/original${tmdbData.data.backdrop_path}`
+          : null;
+        if (tmdbData.data.images.logos.length > 0) {
+          highestVotedLogo = tmdbData.data.images.logos.reduce((max, logo) => {
+            if (
+              logo.iso_639_1 === "en" &&
+              (!max.iso_639_1 ||
+                max.iso_639_1 !== "en" ||
+                logo.vote_count > max.vote_count)
+            ) {
+              return logo;
+            } else if (!max.iso_639_1 || max.iso_639_1 !== "en") {
+              if (
+                logo.iso_639_1 === "ja" &&
+                (!max.iso_639_1 ||
+                  max.iso_639_1 !== "ja" ||
+                  logo.vote_count > max.vote_count)
+              ) {
+                return logo;
+              } else if (!max.iso_639_1 || logo.vote_count > max.vote_count) {
+                return logo;
+              }
+            }
+            return max;
+          }, tmdbData.data.images.logos[0]);
+        }
+        logo = highestVotedLogo
+          ? `https://image.tmdb.org/t/p/original${highestVotedLogo.file_path}`
+          : null;
+      } catch (error) {
+        res.status(500).json({ message: "Internal Server Error", error });
+      }
+    }
+
     res.json({
       id: mediaData.id,
       tmdbId,
       animeChainData,
-      mediaData,
       backdrop_path,
       external_links: mediaData.externalLinks,
       poster_path: mediaData.coverImage.extraLarge,
@@ -873,28 +999,42 @@ app.get("/api/getanime/:id", async function (req, res) {
       overview: mediaData.description,
       hashtag: mediaData.hashtag,
       website: mediaData.siteUrl,
+      streamingEpisodes: mediaData.streamingEpisodes,
     });
   } catch (error) {
     console.error("Error in /api/getanime/:id", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ success: false, message: "Internal Server Error", error });
   }
 });
 
 app.get("/api/getanimebackdrops/:id", async function (req, res) {
   const animeId = req.params.id;
 
-  try {
+  const isMovie = animeMapTVDBIdCache.some(
+    (anime) => anime.themoviedb_id === parseInt(animeId)
+  );
+
+  let backdrops;
+  if (isMovie) {
     const response = await axios.get(
-      `https://api.themoviedb.org/3/tv/${animeId}/images?api_key=${process.env.TMDB_API_KEY}`
+      `https://api.themoviedb.org/3/movie/${animeId}/images?api_key=${process.env.TMDB_API_KEY}`
     );
-    const backdrops = response.data.backdrops;
+    backdrops = response.data.backdrops;
 
     if (backdrops) {
       return res.status(200).send(backdrops);
     }
-  } catch (error) {
-    console.error("Error in /api/getanimebackdrops/:id", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+  } else {
+    const response = await axios.get(
+      `https://api.themoviedb.org/3/tv/${animeId}/images?api_key=${process.env.TMDB_API_KEY}`
+    );
+    backdrops = response.data.backdrops;
+
+    if (backdrops) {
+      return res.status(200).send(backdrops);
+    }
   }
 });
 
