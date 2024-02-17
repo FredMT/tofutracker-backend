@@ -731,6 +731,8 @@ app.get("/api/getanime/:id", async function (req, res) {
           id
           url
           site
+          type
+          icon
         }
         streamingEpisodes {
           title
@@ -788,6 +790,7 @@ app.get("/api/getanime/:id", async function (req, res) {
       animeChainData,
       mediaData,
       backdrop_path,
+      external_links: mediaData.externalLinks,
       poster_path: mediaData.coverImage.extraLarge,
       genres: mediaData.genres,
       logo,
@@ -963,21 +966,25 @@ app.get("/api/getanimeepisodes/:id", async function (req, res) {
         tmdbData.data[`season/${i}`] &&
         tmdbData.data[`season/${i}`].episodes
       ) {
+        const lastEpisode = new Date(
+          tmdbData.data[`season/${i}`].episodes.at(-1).air_date
+        );
         tmdbData.data[`season/${i}`].episodes.forEach((episode) => {
           let airDate = new Date(episode.air_date);
           if (
-            airDate >=
+            (airDate >=
               new Date(
                 mediaData.startDate.year,
                 mediaData.startDate.month - 1,
                 mediaData.startDate.day - 10
               ) &&
-            airDate <=
-              new Date(
-                mediaData.endDate.year,
-                mediaData.endDate.month - 1,
-                mediaData.endDate.day + 10
-              )
+              airDate <=
+                new Date(
+                  mediaData.endDate.year,
+                  mediaData.endDate.month - 1,
+                  mediaData.endDate.day + 10
+                )) ||
+            lastEpisode + 1
           ) {
             filteredEpisodes.push({
               id: episode.id,
@@ -995,7 +1002,6 @@ app.get("/api/getanimeepisodes/:id", async function (req, res) {
         });
       }
     }
-
     res.json(filteredEpisodes);
 
     const { error } = await supabase
