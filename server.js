@@ -14,6 +14,62 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
+const animeListCache = {};
+
+const loadAnimeListToCache = () => {
+  fs.readFile("anime-list.json", "utf8", (err, data) => {
+    if (err) {
+      console.error("Error reading anime-list.json:", err);
+      return;
+    }
+    try {
+      const animeList = JSON.parse(data);
+      animeListCache["animeList"] = animeList["anime-list"]["anime"];
+      console.log("Anime list loaded to cache successfully.");
+    } catch (parseError) {
+      console.error("Error parsing anime-list.json:", parseError);
+    }
+  });
+};
+
+loadAnimeListToCache();
+
+async function getTVDBIDFromAnidbID(id) {
+  const anime = animeListCache["animeList"].find(
+    (anime) => anime["_anidbid"] === id.toString()
+  );
+  if (anime && Boolean(anime["_tvdbid"])) {
+    return anime["_tvdbid"];
+  } else {
+    console.error(`TVDBId for AniDB ID: ${id} not found in cache.`);
+    return;
+  }
+}
+
+async function getIMDBIDFromAnidbID(id) {
+  const anime = animeListCache["animeList"].find(
+    (anime) => anime["_anidbid"] === id.toString()
+  );
+  if (Boolean(anime["_imdbid"])) {
+    return anime["_imdbid"];
+  } else {
+    console.error(`IMDBId for AniDB ID: ${id} not found in cache.`);
+    return;
+  }
+}
+
+async function getTMDBIDFromAniDbId(id) {
+  const anime = animeListCache["animeList"].find(
+    (anime) => anime["_anidbid"] === id.toString()
+  );
+  if (anime && Boolean(anime["_tmdbid"])) {
+    return anime["_tmdbid"];
+  } else {
+    console.error(`IMDBId for AniDB ID: ${id} not found in cache.`);
+    return;
+  }
+}
+
 app.get("/api/trending", async (req, res) => {
   try {
     const trendingResponse = await axios.get(
@@ -739,6 +795,40 @@ app.get("/api/getanimechain/:id", async (req, res) => {
     return;
   }
   res.status(200).send(data);
+});
+
+app.get("/api/getanimeimages/:id", async (req, res) => {
+  const { id } = req.params;
+  let type;
+  let finalid = await getTVDBIDFromAnidbID(id);
+  if (finalid === "movie") {
+    type = "movie";
+    finalid = await getTMDBIDFromAniDbId(id);
+    const response = await axios.get(
+      `https://api.themoviedb.org/3/movie/${finalid}/images?api_key=${process.env.TMDB_API_KEY}`
+    );
+    const { data } = response;
+    return res.status(200).send(data);
+  } else if (finalid) {
+    type = "tv";
+    finalid = await getTVDBIDFromAnidbID(id);
+    const findtmdbid = await axios.get(
+      `https://api.themoviedb.org/3/find/${finalid}?api_key=${process.env.TMDB_API_KEY}&external_source=tvdb_id`
+    );
+    const {
+      data: { tv_results },
+    } = findtmdbid;
+    const tmdbId = tv_results.length > 0 ? tv_results[0].id : null;
+    const response = await axios.get(
+      `https://api.themoviedb.org/3/tv/${tmdbId}/images?api_key=${process.env.TMDB_API_KEY}`
+    );
+    const { data } = response;
+    return res.status(200).send(data);
+  } else {
+    return res
+      .status(404)
+      .send("Cannot find TVDB or TMDB ID to retrieve images");
+  }
 });
 
 app.listen(port, () => {
