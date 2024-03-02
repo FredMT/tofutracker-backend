@@ -45,10 +45,19 @@ async function fetchSeasonDataFromAPI(id, season_number) {
   return response.data;
 }
 
+async function searchMovies(query) {
+  const url = `https://api.themoviedb.org/3/search/movie?api_key=${
+    process.env.TMDB_API_KEY
+  }&query=${encodeURIComponent(query)}`;
+  const response = await axios.get(url);
+  return response.data;
+}
+
 module.exports = {
   fetchMovieLogos,
   fetchTrendingMovies,
   fetchMovieDataFromAPI,
   fetchTVDataFromTMDB,
   fetchSeasonDataFromAPI,
+  searchMovies,
 };
