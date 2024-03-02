@@ -5,12 +5,14 @@ require("dotenv").config();
 const fs = require("fs");
 const xml2js = require("xml2js");
 const supabase = require("./supabaseClient");
-
+const movieRoutes = require("./routes/movieRoutes");
+const trendingRoutes = require("./routes/trendingRoutes");
 const app = express();
 app.use(cors());
 
 const port = process.env.PORT || 8080;
 
+// Load the anime list into cache before starting the server
 const animeListCache = {};
 
 const loadAnimeListToCache = () => {
@@ -70,35 +72,6 @@ const loadTvdbTmdbAnidbListToCache = () => {
 };
 
 loadTvdbTmdbAnidbListToCache();
-async function fetchTrendingMovies(apiKey) {
-  const url = `https://api.themoviedb.org/3/trending/movie/day?api_key=${apiKey}`;
-  const response = await axios.get(url);
-  return response.data.results;
-}
-
-async function fetchMovieLogos(movieId, apiKey) {
-  const url = `https://api.themoviedb.org/3/movie/${movieId}/images?api_key=${apiKey}&include_image_language=en,null`;
-  const response = await axios.get(url);
-  return response.data.logos;
-}
-
-async function enrichMoviesWithLogos(movies, apiKey) {
-  const enrichedMovies = await Promise.all(
-    movies.map(async (movie) => {
-      try {
-        const logos = await fetchMovieLogos(movie.id, apiKey);
-        if (logos && logos.length > 0) {
-          movie.logo_path = logos[0].file_path;
-        }
-        return movie;
-      } catch (error) {
-        console.log(`Error fetching images for movie ID ${movie.id}: ${error}`);
-        return movie; // Return movie without logo in case of error
-      }
-    })
-  );
-  return enrichedMovies;
-}
 
 async function fetchTVDataFromSupabase(id) {
   let { data, error } = await supabase
@@ -236,23 +209,8 @@ async function insertSeasonDataIntoDB(id, season_number, seasonData) {
   }
 }
 
-app.get("/api/trending", async (req, res) => {
-  try {
-    const apiKey = process.env.TMDB_API_KEY;
-    let movies = await fetchTrendingMovies(apiKey);
-    movies = await enrichMoviesWithLogos(movies, apiKey);
-
-    res.send({ results: movies });
-  } catch (error) {
-    console.log(`Error: ${error}`);
-    res
-      .status(500)
-      .send("An error occurred while trying to fetch trending movies");
-  }
-});
-
-const movieRoutes = require("./routes/movieRoutes");
 app.use("/api", movieRoutes);
+app.use("/api", trendingRoutes);
 
 app.get("/api/search/:query", async (req, res) => {
   try {
