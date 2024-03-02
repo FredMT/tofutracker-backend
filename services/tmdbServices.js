@@ -12,4 +12,20 @@ async function fetchTrendingMovies() {
   return response.data.results;
 }
 
-module.exports = { fetchMovieLogos, fetchTrendingMovies };
+async function fetchMovieDataFromAPI(movieId) {
+  try {
+    const response = await axios.get(
+      `https://api.themoviedb.org/3/movie/${movieId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits,keywords,images,similar,videos,watch/providers,release_dates,external_ids`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching movie data from API:", error);
+    throw error;
+  }
+}
+
+module.exports = {
+  fetchMovieLogos,
+  fetchTrendingMovies,
+  fetchMovieDataFromAPI,
+};

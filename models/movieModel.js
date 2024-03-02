@@ -1,5 +1,6 @@
 const axios = require("axios");
 const supabase = require("../supabaseClient");
+const { fetchMovieDataFromAPI } = require("../services/tmdbServices");
 
 async function fetchExistingMovie(movieId) {
   try {
@@ -15,18 +16,6 @@ async function fetchExistingMovie(movieId) {
     return existingMovie;
   } catch (error) {
     console.error("Error fetching existing movie:", error);
-    throw error;
-  }
-}
-
-async function fetchMovieDataFromAPI(movieId) {
-  try {
-    const response = await axios.get(
-      `https://api.themoviedb.org/3/movie/${movieId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits,keywords,images,similar,videos,watch/providers,release_dates,external_ids`
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching movie data from API:", error);
     throw error;
   }
 }
