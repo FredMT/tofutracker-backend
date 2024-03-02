@@ -20,6 +20,18 @@ const loadAnimeListToCache = () => {
 
 loadAnimeListToCache();
 
+function checkForAnime(tvData) {
+  if (tvData.external_ids) {
+    return animeListCache["animeList"].some((anime) => {
+      const animeTvdbId = String(anime._tvdbid);
+      const externalTvdbId = String(tvData.external_ids.tvdb_id);
+      return animeTvdbId === externalTvdbId;
+    });
+  }
+  return false;
+}
+
 module.exports = {
+  checkForAnime,
   animeListCache,
 };
