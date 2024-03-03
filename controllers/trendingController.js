@@ -21,7 +21,7 @@ async function enrichMoviesWithLogos(movies) {
   return enrichedMovies;
 }
 
-async function getTrendingMovies(res) {
+async function getTrendingMovies(_, res) {
   try {
     let movies = await fetchTrendingMovies();
     movies = await enrichMoviesWithLogos(movies);
