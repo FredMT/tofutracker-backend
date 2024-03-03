@@ -1,16 +1,50 @@
 const axios = require("axios");
-const { checkForAnime } = require("../utils/checkForAnime");
+const supabase = require("../supabaseClient");
 
-async function fetchMovieLogos(movieId) {
-  const url = `https://api.themoviedb.org/3/movie/${movieId}/images?api_key=${process.env.TMDB_API_KEY}&include_image_language=en,null`;
+async function fetchLogos(type, id) {
+  const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}&include_image_language=en`;
   const response = await axios.get(url);
   return response.data.logos;
 }
 
-async function fetchTrendingMovies() {
-  const url = `https://api.themoviedb.org/3/trending/movie/day?api_key=${process.env.TMDB_API_KEY}`;
+async function fetchExternalIds(id) {
+  const tmdbUrl = `https://api.themoviedb.org/3/tv/${id}/external_ids?api_key=${process.env.TMDB_API_KEY}`;
+  const tmdbResponse = await axios.get(tmdbUrl);
+  const tvdbId = tmdbResponse.data.tvdb_id;
+
+  let ids = { tvdbId };
+
+  const { data, error } = await supabase
+    .from("anidb_tvdb_tmdb_mapping")
+    .select("anidb_id")
+    .eq("tvdb_id", tvdbId)
+    .single();
+
+  if (!error && data) {
+    ids.anidbId = data.anidb_id;
+  } else if (error && error.code !== "PGRST116" && error.code !== "22P02") {
+    console.error("Error fetching external IDs:", error);
+  }
+
+  return ids;
+}
+
+async function fetchTrending(type) {
+  const url = `https://api.themoviedb.org/3/trending/${type}/day?api_key=${process.env.TMDB_API_KEY}`;
   const response = await axios.get(url);
-  return response.data.results;
+  let results = response.data.results;
+
+  if (type === "tv") {
+    results = results.map((item) => {
+      if (item.name) {
+        item.title = item.name;
+        delete item.name;
+      }
+      return item;
+    });
+  }
+
+  return results.sort((a, b) => b.popularity - a.popularity).slice(0, 10);
 }
 
 async function fetchMovieDataFromAPI(movieId) {
@@ -31,10 +65,6 @@ async function fetchTVDataFromTMDB(id) {
   );
   const tvData = response.data;
 
-  if (checkForAnime(tvData)) {
-    throw new Error("This is an anime.");
-  }
-
   return tvData;
 }
 
@@ -54,10 +84,11 @@ async function searchMovies(query) {
 }
 
 module.exports = {
-  fetchMovieLogos,
-  fetchTrendingMovies,
+  fetchLogos,
+  fetchTrending,
   fetchMovieDataFromAPI,
   fetchTVDataFromTMDB,
+  fetchExternalIds,
   fetchSeasonDataFromAPI,
   searchMovies,
 };

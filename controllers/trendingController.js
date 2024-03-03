@@ -1,38 +1,55 @@
 const {
-  fetchMovieLogos,
-  fetchTrendingMovies,
+  fetchLogos,
+  fetchTrending,
+  fetchExternalIds,
 } = require("../services/tmdbServices");
 
-async function enrichMoviesWithLogos(movies) {
-  const enrichedMovies = await Promise.all(
-    movies.map(async (movie) => {
+async function enrichWithLogos(items, type) {
+  const enrichedItems = await Promise.all(
+    items.map(async (item) => {
       try {
-        const logos = await fetchMovieLogos(movie.id);
+        // Fetch logos
+        const logos = await fetchLogos(type, item.id);
         if (logos && logos.length > 0) {
-          movie.logo_path = logos[0].file_path;
+          item.logo_path = `https://image.tmdb.org/t/p/original${logos[0].file_path}`;
         }
-        return movie;
+
+        if (type === "tv") {
+          const ids = await fetchExternalIds(item.id);
+          if (ids) {
+            item.anidb_id = ids.anidbId;
+            item.tvdb_id = ids.tvdbId;
+          }
+        }
+
+        if (item.anidb_id) {
+          item.media_type = "anime";
+        }
+        return item;
       } catch (error) {
-        console.log(`Error fetching images for movie ID ${movie.id}: ${error}`);
-        return movie; // Return movie without logo in case of error
+        console.log(`Error enriching ${type} ID ${item.id}: ${error}`);
+        return item; // Return item without additional data in case of error
       }
     })
   );
-  return enrichedMovies;
+  return enrichedItems;
 }
 
-async function getTrendingMovies(_, res) {
+async function getTrending(_, res) {
   try {
-    let movies = await fetchTrendingMovies();
-    movies = await enrichMoviesWithLogos(movies);
+    let movies = await fetchTrending("movie");
+    let tvShows = await fetchTrending("tv");
 
-    res.send({ results: movies });
+    movies = await enrichWithLogos(movies, "movie");
+    tvShows = await enrichWithLogos(tvShows, "tv");
+
+    res.send({ movies, tvShows });
   } catch (error) {
     console.log(`Error: ${error}`);
     res
       .status(500)
-      .send("An error occurred while trying to fetch trending movies");
+      .send("An error occurred while trying to fetch trending items");
   }
 }
 
-module.exports = { getTrendingMovies };
+module.exports = { getTrending };

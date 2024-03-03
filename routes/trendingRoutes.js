@@ -1,8 +1,8 @@
 const express = require("express");
-const { getTrendingMovies } = require("../controllers/trendingController");
+const { getTrending } = require("../controllers/trendingController");
 
 const router = express.Router();
 
-router.get("/trending", getTrendingMovies);
+router.get("/trending", getTrending);
 
 module.exports = router;

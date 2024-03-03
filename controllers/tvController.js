@@ -1,4 +1,4 @@
-const { animeListCache } = require("../utils/checkForAnime");
+const supabase = require("../supabaseClient");
 const {
   fetchTVDataFromSupabase,
   insertTVDataIntoSupabase,
@@ -12,15 +12,19 @@ const {
 
 async function processAndTrimTVData(tvData) {
   if (tvData.external_ids) {
-    const animeFound = animeListCache["animeList"].some((anime) => {
-      const animeTvdbId = String(anime._tvdbid);
-      const externalTvdbId = String(tvData.external_ids.tvdb_id);
+    const { data, error } = await supabase
+      .from("anidb_tvdb_tmdb_mapping")
+      .select("anidb_id")
+      .eq("tvdb_id", tvData.external_ids.tvdb_id)
+      .single();
 
-      return animeTvdbId === externalTvdbId;
-    });
+    if (error && error.code !== "PGRST116") {
+      console.error("Error querying anidb_tvdb_tmdb_mapping:", error.message);
+      throw new Error("Internal server error.");
+    }
 
-    if (animeFound) {
-      return res.status(403).send("This is an anime.");
+    if (Boolean(data)) {
+      throw new Error("This is an anime.");
     } else {
       if (tvData.aggregate_credits && tvData.aggregate_credits.cast) {
         tvData.aggregate_credits.cast = tvData.aggregate_credits.cast
@@ -73,14 +77,24 @@ async function getTV(req, res) {
     let tvData = await fetchTVDataFromSupabase(id);
     if (!tvData) {
       tvData = await fetchTVDataFromTMDB(id);
-      await processAndTrimTVData(tvData);
-      await insertTVDataIntoSupabase(id, tvData);
+      const processed = await processAndTrimTVData(tvData);
+      if (processed === true) {
+        await insertTVDataIntoSupabase(id, tvData);
+        res.status(200).send(tvData);
+      }
+    } else {
+      res.status(200).send(tvData);
     }
-    res.status(200).send(tvData);
   } catch (error) {
-    res
-      .status(500)
-      .send("An error occurred while processing the request: " + error.message);
+    if (error.message === "This is an anime.") {
+      res.send("This is an anime.");
+    } else {
+      res
+        .status(500)
+        .send(
+          "An error occurred while processing the request: " + error.message
+        );
+    }
   }
 }
 

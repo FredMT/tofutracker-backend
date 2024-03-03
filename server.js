@@ -6,6 +6,7 @@ const movieRoutes = require("./routes/movieRoutes");
 const tvRoutes = require("./routes/tvRoutes");
 const animeRoutes = require("./routes/animeRoutes");
 const searchRoutes = require("./routes/searchRoutes");
+const trendingCron = require("./cron/trending");
 
 const app = express();
 app.use(cors());
