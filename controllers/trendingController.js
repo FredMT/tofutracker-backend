@@ -3,6 +3,8 @@ const {
   fetchTrending,
   fetchExternalIds,
 } = require("../services/tmdbServices");
+const { fetchAnidbTrending } = require("../services/anidbServices");
+const supabase = require("../supabaseClient");
 
 async function enrichWithLogos(items, type) {
   const enrichedItems = await Promise.all(
@@ -36,20 +38,30 @@ async function enrichWithLogos(items, type) {
 }
 
 async function getTrending(_, res) {
-  try {
-    let movies = await fetchTrending("movie");
-    let tvShows = await fetchTrending("tv");
+  const { data, error } = await supabase
+    .from("trending")
+    .select("movies, tvShows, anime")
+    .eq("id", 1);
 
-    movies = await enrichWithLogos(movies, "movie");
-    tvShows = await enrichWithLogos(tvShows, "tv");
-
-    res.send({ movies, tvShows });
-  } catch (error) {
-    console.log(`Error: ${error}`);
-    res
-      .status(500)
-      .send("An error occurred while trying to fetch trending items");
+  if (error) {
+    console.error("Supabase error:", error);
+    return res.status(500).json({ error: error.message });
   }
+
+  return res.json(data[0]);
 }
 
-module.exports = { getTrending };
+async function fetchTrendingFromAPIS() {
+  let movies = await fetchTrending("movie");
+  let tvShows = await fetchTrending("tv");
+  let anime = await fetchAnidbTrending();
+
+  movies = await enrichWithLogos(movies, "movie");
+  tvShows = await enrichWithLogos(tvShows, "tv");
+
+  const trendingData = { movies, tvShows, anime };
+
+  return trendingData;
+}
+
+module.exports = { getTrending, fetchTrendingFromAPIS };
