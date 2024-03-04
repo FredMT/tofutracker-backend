@@ -2,9 +2,9 @@ const supabase = require("../supabaseClient");
 const cron = require("node-cron");
 const { fetchTrendingFromAPIS } = require("../controllers/trendingController");
 
-cron.schedule("42 13 * * *", async () => {
+cron.schedule(" 51 13 * * *", async () => {
   console.log(
-    "Running cron job every day at 13:42 to fetch and update trending items"
+    "Running cron job every day at 13:51 to fetch and update trending items"
   );
   const data = await fetchTrendingFromAPIS();
 

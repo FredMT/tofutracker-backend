@@ -58,8 +58,9 @@ async function fetchTrendingFromAPIS() {
 
   movies = await enrichWithLogos(movies, "movie");
   tvShows = await enrichWithLogos(tvShows, "tv");
+  let updated_at = new Date().toISOString();
 
-  const trendingData = { movies, tvShows, anime };
+  const trendingData = { movies, tvShows, anime, updated_at };
 
   return trendingData;
 }
