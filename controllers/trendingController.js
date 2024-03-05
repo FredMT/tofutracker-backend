@@ -65,7 +65,7 @@ async function fetchTrendingFromAPIS() {
   return trendingData;
 }
 
-async function updateTrending() {
+async function updateTrending(_, res) {
   console.log(
     "Running cron job every day at 14:15 to fetch and update trending items"
   );
@@ -80,7 +80,7 @@ async function updateTrending() {
 
   console.log("Cron job done");
 
-  res.send("Trending items updated successfully");
+  return res.status(200).json({ message: "Trending items updated" });
 }
 
 module.exports = { getTrending, fetchTrendingFromAPIS, updateTrending };
