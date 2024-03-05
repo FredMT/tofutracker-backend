@@ -43,4 +43,20 @@ async function checkIfAnime(id) {
   return false;
 }
 
-module.exports = { getAnime, getAnimeChain, checkIfAnime };
+async function getMapping(id) {
+  const { data, error } = await supabase
+    .from("anidb_tvdb_tmdb_mapping")
+    .select("*")
+    .eq("anidb_id", id);
+
+  if (error && error.code !== "PGRST116") {
+    console.error("Error querying anidb_tvdb_tmdb_mapping:", error.message);
+    throw new Error("Internal server error.");
+  }
+
+  if (data.length > 0) {
+    return data[0];
+  }
+}
+
+module.exports = { getAnime, getAnimeChain, checkIfAnime, getMapping };
