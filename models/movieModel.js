@@ -60,6 +60,7 @@ const insertMovieData = async (movieResponse, movieId) => {
       backdrop_path: movieResponse.backdrop_path
         ? `https://image.tmdb.org/t/p/original${movieResponse.backdrop_path}`
         : null,
+
       release_date: movieResponse.release_date,
       runtime: movieResponse.runtime,
       vote_average: movieResponse.vote_average,
