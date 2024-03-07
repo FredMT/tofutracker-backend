@@ -99,7 +99,7 @@ async function fetchRelations(req, res) {
   const id = req.params.id;
   const relations = await getRelations(id);
   if (!relations || relations.length === 0) {
-    return res.status(404).send({
+    return res.status(200).send({
       success: false,
       message: "Anime relations not found.",
       data: "No relations available for this anime.",
