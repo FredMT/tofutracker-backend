@@ -112,10 +112,51 @@ async function fetchRelations(req, res) {
   });
 }
 
+async function fetchAnimeEpisodes(req, res) {
+  const { id, start_date, end_date } = req.params;
+  const tmdbIdResult = await fetchTmdbId(id);
+  if (!tmdbIdResult.success) {
+    return res
+      .status(500)
+      .send({ success: false, message: "TMDB ID not found." });
+  }
+  const tmdbId = tmdbIdResult.tmdb_id;
+  const url = `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${process.env.TMDB_API_KEY}&append_to_response=season/1,season/2,season/3,season/4,season/5,season/6,season/7,season/8,season/9,season/10,season/11,season/12,season/13,season/14,season/15,season/16,season/17,season/18,season/19`;
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    const episodesWithinDateRange = [];
+
+    // Convert start_date and end_date to Date objects
+    const startDate = new Date(start_date);
+    const endDate = new Date(end_date);
+
+    // Iterate through each season in the append_to_response
+    for (let i = 1; i <= 19; i++) {
+      const season = data[`season/${i}`];
+      if (season && season.episodes) {
+        const filteredEpisodes = season.episodes.filter((episode) => {
+          const airDate = new Date(episode.air_date);
+          return airDate >= startDate && airDate <= endDate;
+        });
+        episodesWithinDateRange.push(...filteredEpisodes);
+      }
+    }
+
+    res.json({ success: true, episodes: episodesWithinDateRange });
+  } catch (error) {
+    console.error("Error fetching anime episodes:", error);
+    res
+      .status(500)
+      .send({ success: false, message: "Error fetching anime episodes." });
+  }
+}
+
 module.exports = {
   fetchAnime,
   fetchAnimeChain,
   fetchTmdbId,
   fetchAnimeImagesFromTMDB,
   fetchRelations,
+  fetchAnimeEpisodes,
 };
