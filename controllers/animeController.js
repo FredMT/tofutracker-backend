@@ -135,15 +135,24 @@ async function fetchAnimeEpisodes(req, res) {
     for (let i = 1; i <= 19; i++) {
       const season = data[`season/${i}`];
       if (season && season.episodes) {
-        const filteredEpisodes = season.episodes.filter((episode) => {
-          const airDate = new Date(episode.air_date);
-          return airDate >= startDate && airDate <= endDate;
-        });
+        const filteredEpisodes = season.episodes
+          .filter((episode) => {
+            const airDate = new Date(episode.air_date);
+            return airDate >= startDate && airDate <= endDate;
+          })
+          .map((episode) => ({
+            air_date: episode.air_date,
+            episode_number: episode.episode_number,
+            episode_name: episode.name, // Assuming 'name' is the field for episode name
+            episode_overview: episode.overview,
+            runtime: episode.runtime,
+            still_path: episode.still_path,
+          }));
         episodesWithinDateRange.push(...filteredEpisodes);
       }
     }
 
-    res.json({ success: true, episodes: episodesWithinDateRange });
+    res.json({ success: true, data: episodesWithinDateRange });
   } catch (error) {
     console.error("Error fetching anime episodes:", error);
     res
