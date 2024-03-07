@@ -3,6 +3,10 @@ const {
   getAnimeChain,
   getMapping,
   getRelations,
+  getSimilarAnimeDetails,
+  getAnidbIDFromTMDBId,
+  getAnidbIDFromTVDBId,
+  getMultipleSimilarAnimeDetails,
 } = require("../models/animeModel");
 const supabase = require("../supabaseClient");
 
@@ -129,7 +133,10 @@ async function fetchAnimeEpisodes(req, res) {
 
     // Convert start_date and end_date to Date objects
     const startDate = new Date(start_date);
-    const endDate = new Date(end_date);
+    const endDate =
+      end_date === "null"
+        ? new Date(new Date().toISOString().split("T")[0])
+        : new Date(end_date);
 
     // Iterate through each season in the append_to_response
     for (let i = 1; i <= 19; i++) {
@@ -161,6 +168,97 @@ async function fetchAnimeEpisodes(req, res) {
   }
 }
 
+async function fetchSimilarAnime(req, res) {
+  const { id, type } = req.params;
+  const animeData = await getAnime(id);
+
+  if (!animeData) {
+    return res
+      .status(404)
+      .send({ success: false, message: "Anime not found." });
+  }
+
+  const similarAnimeObjects = animeData[0].anime_similar;
+
+  if (!similarAnimeObjects) {
+    try {
+      const tmdbIdResult = await fetchTmdbId(id);
+
+      if (!tmdbIdResult.success) {
+        return res
+          .status(500)
+          .send({ success: false, message: "TMDB ID not found." });
+      }
+
+      const url = `https://api.themoviedb.org/3/${type.toString()}/${
+        tmdbIdResult.tmdb_id
+      }/similar?api_key=${process.env.TMDB_API_KEY}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        const similarAnimeIds = data.results.map((anime) => anime.id);
+
+        const { data: similarAnidbIDs, error } = await supabase
+          .from("anidb_tvdb_tmdb_mapping")
+          .select("anidb_id")
+          .in("tmdb_id", similarAnimeIds);
+
+        if (error) {
+          console.error("Error fetching data:", error);
+          return;
+        }
+
+        const anidbIds = similarAnidbIDs.map((similar) => similar.anidb_id);
+
+        try {
+          const similarAnimeDetails = await getMultipleSimilarAnimeDetails(
+            anidbIds
+          );
+
+          if (!similarAnimeDetails || similarAnimeDetails.length === 0) {
+            return res.send({
+              success: false,
+              message: "No similar anime found.",
+            });
+          }
+          return res.send({ success: true, data: similarAnimeDetails });
+        } catch (error) {
+          return res.status(500).send({
+            success: false,
+            message: "Error fetching similar anime details.",
+          });
+        }
+      } catch (error) {
+        return res.status(500).send({
+          success: false,
+          message: "Could not find similar anime.",
+        });
+      }
+    } catch (error) {
+      return res.status(500).send({
+        success: false,
+        message: "Could not find similar anime.",
+      });
+    }
+  }
+
+  const similarAnimeDetailsPromises = similarAnimeObjects.map((similar) =>
+    getSimilarAnimeDetails(similar.similar_id)
+  );
+
+  try {
+    const similarAnimeDetails = await Promise.all(similarAnimeDetailsPromises);
+    res.send(similarAnimeDetails);
+  } catch (error) {
+    console.error("Error fetching similar anime details:", error);
+    res.status(500).send({
+      success: false,
+      message: "Error fetching similar anime details.",
+    });
+  }
+}
+
 module.exports = {
   fetchAnime,
   fetchAnimeChain,
@@ -168,4 +266,5 @@ module.exports = {
   fetchAnimeImagesFromTMDB,
   fetchRelations,
   fetchAnimeEpisodes,
+  fetchSimilarAnime,
 };

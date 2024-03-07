@@ -72,10 +72,79 @@ async function getRelations(id) {
   return data;
 }
 
+async function getSimilarAnimeDetails(id) {
+  const { data, error } = await supabase
+    .from("anidb_anime")
+    .select("id, title, rating, start_date, poster")
+    .eq("id", id);
+
+  if (error && error.code !== "PGRST116") {
+    return { status: 500, message: "Error querying anidb_anime." };
+  }
+
+  return data[0];
+}
+
+async function getMultipleSimilarAnimeDetails(ids) {
+  const { data, error } = await supabase
+    .from("anidb_anime")
+    .select("id, title, rating, start_date, poster")
+    .in("id", ids);
+
+  if (error && error.code !== "PGRST116") {
+    return {
+      status: 500,
+      message: "Error querying multiple similar anime details.",
+    };
+  }
+
+  return data;
+}
+
+async function getAnidbIDFromTMDBId(id) {
+  const { data, error } = await supabase
+    .from("anidb_tvdb_tmdb_mapping")
+    .select("anidb_id")
+    .eq("tmdb_id", id);
+
+  if (error && error.code !== "PGRST116") {
+    return {
+      success: false,
+      message: "Error querying anidb_tvdb_tmdb_mapping.",
+    };
+  }
+
+  if (data.length > 0) {
+    return { success: true, anidb_id: data[0].anidb_id };
+  }
+}
+
+async function getAnidbIDFromTVDBId(id) {
+  const { data, error } = await supabase
+    .from("anidb_tvdb_tmdb_mapping")
+    .select("anidb_id")
+    .eq("tvdb_id", id);
+
+  if (error && error.code !== "PGRST116") {
+    return {
+      success: false,
+      message: "Error querying anidb_tvdb_tmdb_mapping.",
+    };
+  }
+
+  if (data.length > 0) {
+    return { success: true, anidb_id: data[0].anidb_id };
+  }
+}
+
 module.exports = {
   getAnime,
   getAnimeChain,
   checkIfAnime,
   getMapping,
   getRelations,
+  getSimilarAnimeDetails,
+  getMultipleSimilarAnimeDetails,
+  getAnidbIDFromTMDBId,
+  getAnidbIDFromTVDBId,
 };
