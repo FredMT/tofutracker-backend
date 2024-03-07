@@ -34,7 +34,7 @@ async function checkIfAnime(id) {
 
   if (error && error.code !== "PGRST116") {
     console.error("Error querying anidb_tvdb_tmdb_mapping:", error.message);
-    throw new Error("Internal server error.");
+    return { status: 500, message: "Error querying anidb_tvdb_tmdb_mapping." };
   }
 
   if (data.length > 0) {
@@ -51,7 +51,7 @@ async function getMapping(id) {
 
   if (error && error.code !== "PGRST116") {
     console.error("Error querying anidb_tvdb_tmdb_mapping:", error.message);
-    throw new Error("Internal server error.");
+    return { status: 500, message: "Error querying anidb_tvdb_tmdb_mapping." };
   }
 
   if (data.length > 0) {
@@ -59,4 +59,23 @@ async function getMapping(id) {
   }
 }
 
-module.exports = { getAnime, getAnimeChain, checkIfAnime, getMapping };
+async function getRelations(id) {
+  const { data, error } = await supabase
+    .from("anidb_relations")
+    .select("anime_id, related_id, type")
+    .eq("anime_id", id);
+
+  if (error && error.code !== "PGRST116") {
+    return { status: 500, message: "Error querying anidb_relations." };
+  }
+
+  return data;
+}
+
+module.exports = {
+  getAnime,
+  getAnimeChain,
+  checkIfAnime,
+  getMapping,
+  getRelations,
+};

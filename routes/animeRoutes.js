@@ -3,8 +3,8 @@ const express = require("express");
 const {
   fetchAnime,
   fetchAnimeChain,
-  fetchTmdbId,
   fetchAnimeImagesFromTMDB,
+  fetchRelations,
 } = require("../controllers/animeController");
 
 const router = express.Router();
@@ -12,5 +12,6 @@ const router = express.Router();
 router.get("/getanime/:id", fetchAnime);
 router.get("/getanimechain/:id", fetchAnimeChain);
 router.get("/getanimeimages/:type/:id", fetchAnimeImagesFromTMDB);
+router.get("/getanimerelations/:id", fetchRelations);
 
 module.exports = router;

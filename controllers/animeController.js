@@ -1,4 +1,9 @@
-const { getAnime, getAnimeChain, getMapping } = require("../models/animeModel");
+const {
+  getAnime,
+  getAnimeChain,
+  getMapping,
+  getRelations,
+} = require("../models/animeModel");
 const supabase = require("../supabaseClient");
 
 async function fetchAnime(req, res) {
@@ -6,7 +11,7 @@ async function fetchAnime(req, res) {
   const animeData = await getAnime(id);
 
   if (!animeData) {
-    return res.status(404).send("Anime not found.");
+    return res.status(404).send({ message: "Anime not found." });
   }
 
   res.json(animeData);
@@ -17,25 +22,27 @@ async function fetchAnimeChain(req, res) {
   const animeChain = await getAnimeChain(id);
 
   if (!animeChain) {
-    return res.status(404).send("Anime chain not found.");
+    return res
+      .status(404)
+      .send({ success: false, message: "Anime chain not found." });
   }
 
-  res.json(animeChain);
+  res.json({ success: true, data: animeChain });
 }
 
 async function fetchTmdbId(id) {
   const data = await getMapping(id);
 
   if (!data) {
-    throw new Error("Anime mapping not found");
+    return { success: false, status: 404, message: "Anime mapping not found." };
   }
 
-  if (data.tmdb_id) {
-    return data.tmdb_id;
+  if (data && data.tmdb_id) {
+    return { success: true, tmdb_id: data.tmdb_id };
   }
 
   if (!data.tmdb_id && !data.tvdb_id) {
-    throw new Error("Anime mapping not found");
+    return { success: false, status: 404, message: "Anime mapping not found." };
   }
 
   if (data.anidb_id && data.tvdb_id) {
@@ -52,34 +59,57 @@ async function fetchTmdbId(id) {
             .eq("anidb_id", id);
 
           if (error) {
-            throw new Error("Error updating anime mapping.", error);
+            return {
+              success: false,
+              status: 500,
+              message: "Error updating anime mapping.",
+            };
           }
 
-          return tvResult.id;
+          return { success: true, tmdb_id: tvResult.id };
         } else {
-          throw new Error("No TV result found for TVDB ID:", data.tvdb_id);
+          return { success: false, status: 500, message: "TVDB ID not found." };
         }
       }
     } catch (error) {
-      console.error("Error fetching from TMDB:", error.message);
-      throw new Error("Error fetching from TMDB:", error.message);
+      return { success: false, status: 500, message: error.message };
     }
   }
 }
 
 async function fetchAnimeImagesFromTMDB(req, res) {
   const { type, id } = req.params;
-  console.log(type, id);
-  const tmdbId = await fetchTmdbId(id);
-  const url = `https://api.themoviedb.org/3/${type}/${tmdbId}/images?api_key=${process.env.TMDB_API_KEY}`;
+  const tmdbIdResult = await fetchTmdbId(id);
+  if (!tmdbIdResult.success) {
+    return res
+      .status(500)
+      .send({ success: false, message: "TMDB ID not found." });
+  }
+  const url = `https://api.themoviedb.org/3/${type}/${tmdbIdResult.tmdb_id}/images?api_key=${process.env.TMDB_API_KEY}`;
   try {
     const response = await fetch(url);
     const data = await response.json();
-    return res.json(data);
+    return res.json({ success: true, data: data });
   } catch (error) {
-    console.error("Error fetching from TMDB:", error.message);
-    return null;
+    res.status(500).send({ success: false, message: error.message });
   }
+}
+
+async function fetchRelations(req, res) {
+  const id = req.params.id;
+  const relations = await getRelations(id);
+  if (!relations || relations.length === 0) {
+    return res.status(404).send({
+      success: false,
+      message: "Anime relations not found.",
+      data: "No relations available for this anime.",
+    });
+  }
+  res.json({
+    success: true,
+    message: "Anime relations found",
+    data: relations,
+  });
 }
 
 module.exports = {
@@ -87,4 +117,5 @@ module.exports = {
   fetchAnimeChain,
   fetchTmdbId,
   fetchAnimeImagesFromTMDB,
+  fetchRelations,
 };
