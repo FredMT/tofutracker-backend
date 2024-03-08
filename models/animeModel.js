@@ -88,7 +88,7 @@ async function getSimilarAnimeDetails(id) {
 async function getMultipleSimilarAnimeDetails(ids) {
   const { data, error } = await supabase
     .from("anidb_anime")
-    .select("id, title, rating, start_date, poster")
+    .select("id, title, rating, start_date, poster, type")
     .in("id", ids);
 
   if (error && error.code !== "PGRST116") {

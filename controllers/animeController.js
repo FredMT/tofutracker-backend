@@ -195,7 +195,11 @@ async function fetchSimilarAnime(req, res) {
 
       try {
         const response = await fetch(url);
-        const data = await response.json();
+        let data = await response.json();
+        data.results = data.results.filter(
+          (anime) =>
+            anime.genre_ids.includes(16) && anime.origin_country.includes("JP")
+        );
         const similarAnimeIds = data.results.map((anime) => anime.id);
 
         for (const id of similarAnimeIds) {
@@ -255,7 +259,7 @@ async function fetchSimilarAnime(req, res) {
 
   try {
     const similarAnimeDetails = await Promise.all(similarAnimeDetailsPromises);
-    res.send(similarAnimeDetails);
+    res.send({ success: true, data: similarAnimeDetails });
   } catch (error) {
     console.error("Error fetching similar anime details:", error);
     res.status(500).send({
@@ -269,7 +273,8 @@ async function checkAndInsertTMDBId(id) {
   const { data, error } = await supabase
     .from("anidb_tvdb_tmdb_mapping")
     .select("*")
-    .eq("tmdb_id", id);
+    .eq("tmdb_id", id)
+    .limit(1);
 
   if (data) {
     return;
@@ -285,8 +290,6 @@ async function checkAndInsertTMDBId(id) {
 
   if (error.code === "PGRST116") {
     const url = `https://api.themoviedb.org/3/tv/${id}/external_ids?api_key=${process.env.TMDB_API_KEY}`;
-
-    console.log(url);
 
     try {
       const response = await fetch(url);
