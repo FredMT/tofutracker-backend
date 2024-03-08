@@ -3,6 +3,7 @@ const {
   getAnimeChain,
   getMapping,
   getRelations,
+  getRelatedAnimeInfo,
   getSimilarAnimeDetails,
   getMultipleSimilarAnimeDetails,
 } = require("../models/animeModel");
@@ -113,6 +114,20 @@ async function fetchRelations(req, res) {
     message: "Anime relations found",
     data: relations,
   });
+}
+
+async function fetchRelationsInfo(req, res) {
+  const id = req.params.id;
+
+  const data = await getRelatedAnimeInfo(id);
+
+  if (!data.success) {
+    return res
+      .status(data.status)
+      .send({ success: false, message: data.message });
+  }
+
+  return res.json({ success: true, data: data.data });
 }
 
 async function fetchAnimeEpisodes(req, res) {
@@ -353,6 +368,7 @@ module.exports = {
   fetchTmdbId,
   fetchAnimeImagesFromTMDB,
   fetchRelations,
+  fetchRelationsInfo,
   fetchAnimeEpisodes,
   fetchSimilarAnime,
 };

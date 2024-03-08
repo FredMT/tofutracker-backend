@@ -13,6 +13,26 @@ async function getAnime(id) {
   return data;
 }
 
+async function getRelatedAnimeInfo(id) {
+  const { data, error } = await supabase.rpc(
+    "get_anime_relations_and_details",
+    {
+      anime_id: id,
+    }
+  );
+
+  if (error && error.code !== "PGRST116") {
+    console.error("Error querying anidb_anime:", error.message);
+    return {
+      sucess: false,
+      status: 500,
+      message: "Error querying anidb_anime.",
+    };
+  }
+
+  return { success: true, data: data };
+}
+
 async function getAnimeChain(id) {
   const { data, error } = await supabase.rpc("get_complete_anime_chain", {
     start_id: id,
@@ -145,6 +165,7 @@ module.exports = {
   checkIfAnime,
   getMapping,
   getRelations,
+  getRelatedAnimeInfo,
   getSimilarAnimeDetails,
   getMultipleSimilarAnimeDetails,
   getAnidbIDFromTMDBId,
