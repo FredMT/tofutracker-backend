@@ -98,7 +98,9 @@ async function getMultipleSimilarAnimeDetails(ids) {
     };
   }
 
-  return data;
+  data.sort((a, b) => b.rating - a.rating);
+  const topRated = data.slice(0, 20);
+  return topRated;
 }
 
 async function getAnidbIDFromTMDBId(id) {

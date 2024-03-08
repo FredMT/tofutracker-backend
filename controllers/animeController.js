@@ -4,10 +4,9 @@ const {
   getMapping,
   getRelations,
   getSimilarAnimeDetails,
-  getAnidbIDFromTMDBId,
-  getAnidbIDFromTVDBId,
   getMultipleSimilarAnimeDetails,
 } = require("../models/animeModel");
+
 const supabase = require("../supabaseClient");
 
 async function fetchAnime(req, res) {
@@ -192,12 +191,16 @@ async function fetchSimilarAnime(req, res) {
 
       const url = `https://api.themoviedb.org/3/${type.toString()}/${
         tmdbIdResult.tmdb_id
-      }/similar?api_key=${process.env.TMDB_API_KEY}`;
+      }/recommendations?api_key=${process.env.TMDB_API_KEY}`;
 
       try {
         const response = await fetch(url);
         const data = await response.json();
         const similarAnimeIds = data.results.map((anime) => anime.id);
+
+        for (const id of similarAnimeIds) {
+          await checkAndInsertTMDBId(id);
+        }
 
         const { data: similarAnidbIDs, error } = await supabase
           .from("anidb_tvdb_tmdb_mapping")
@@ -206,7 +209,10 @@ async function fetchSimilarAnime(req, res) {
 
         if (error) {
           console.error("Error fetching data:", error);
-          return;
+          return res.status(500).send({
+            success: false,
+            message: "Error fetching similar anime details.",
+          });
         }
 
         const anidbIds = similarAnidbIDs.map((similar) => similar.anidb_id);
@@ -256,6 +262,85 @@ async function fetchSimilarAnime(req, res) {
       success: false,
       message: "Error fetching similar anime details.",
     });
+  }
+}
+
+async function checkAndInsertTMDBId(id) {
+  const { data, error } = await supabase
+    .from("anidb_tvdb_tmdb_mapping")
+    .select("*")
+    .eq("tmdb_id", id);
+
+  if (data) {
+    return;
+  }
+
+  if (error && error.code !== "PGRST116") {
+    return {
+      success: false,
+      message: "Error querying anidb_tvdb_tmdb_mapping.",
+      error,
+    };
+  }
+
+  if (error.code === "PGRST116") {
+    const url = `https://api.themoviedb.org/3/tv/${id}/external_ids?api_key=${process.env.TMDB_API_KEY}`;
+
+    console.log(url);
+
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      const tvdbId = data.tvdb_id;
+
+      if (!tvdbId) {
+        return {
+          success: false,
+          message: "TVDB ID not found.",
+        };
+      }
+
+      if (tvdbId) {
+        const { data, error } = await supabase
+          .from("anidb_tvdb_tmdb_mapping")
+          .select("*")
+          .eq("tvdb_id", tvdbId);
+
+        if (error) {
+          return {
+            success: false,
+            message: "Error querying anidb_tvdb_tmdb_mapping.",
+            error,
+          };
+        }
+
+        if (data.length > 0) {
+          const { error } = await supabase
+            .from("anidb_tvdb_tmdb_mapping")
+            .update({ tmdb_id: id })
+            .eq("tvdb_id", tvdbId);
+
+          if (error) {
+            return {
+              success: false,
+              message: "Error updating anidb_tvdb_tmdb_mapping.",
+              error,
+            };
+          }
+        }
+      }
+      return { success: true, message: "TVDB ID added." };
+    } catch (error) {
+      return {
+        success: false,
+        message: "Error querying anidb_tvdb_tmdb_mapping.",
+        error,
+      };
+    }
+  }
+
+  if (data) {
+    return { success: true, data };
   }
 }
 

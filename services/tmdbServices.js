@@ -7,28 +7,6 @@ async function fetchLogos(type, id) {
   return response.data.logos;
 }
 
-async function fetchExternalIds(id) {
-  const tmdbUrl = `https://api.themoviedb.org/3/tv/${id}/external_ids?api_key=${process.env.TMDB_API_KEY}`;
-  const tmdbResponse = await axios.get(tmdbUrl);
-  const tvdbId = tmdbResponse.data.tvdb_id;
-
-  let ids = { tvdbId };
-
-  const { data, error } = await supabase
-    .from("anidb_tvdb_tmdb_mapping")
-    .select("anidb_id")
-    .eq("tvdb_id", tvdbId)
-    .single();
-
-  if (!error && data) {
-    ids.anidbId = data.anidb_id;
-  } else if (error && error.code !== "PGRST116" && error.code !== "22P02") {
-    console.error("Error fetching external IDs:", error);
-  }
-
-  return ids;
-}
-
 async function fetchTrending(type) {
   const url = `https://api.themoviedb.org/3/trending/${type}/day?api_key=${process.env.TMDB_API_KEY}`;
   const response = await axios.get(url);
@@ -88,7 +66,6 @@ module.exports = {
   fetchTrending,
   fetchMovieDataFromAPI,
   fetchTVDataFromTMDB,
-  fetchExternalIds,
   fetchSeasonDataFromAPI,
   searchMovies,
 };
