@@ -1,10 +1,15 @@
 const axios = require("axios");
-const supabase = require("../supabaseClient");
 
 async function fetchLogos(type, id) {
   const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}&include_image_language=en`;
   const response = await axios.get(url);
   return response.data.logos;
+}
+
+async function fetchPoster(type, id) {
+  const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${process.env.TMDB_API_KEY}`;
+  const response = await axios.get(url);
+  return `https://image.tmdb.org/t/p/w780${response.data.poster_path}`;
 }
 
 async function fetchTrending(type) {
@@ -63,6 +68,7 @@ async function searchMovies(query) {
 
 module.exports = {
   fetchLogos,
+  fetchPoster,
   fetchTrending,
   fetchMovieDataFromAPI,
   fetchTVDataFromTMDB,
