@@ -88,7 +88,6 @@ async function searchMovies(query) {
 module.exports = {
   fetchLogos,
   fetchPoster,
-  fetchPosterTest,
   fetchTrending,
   fetchMovieDataFromAPI,
   fetchTVDataFromTMDB,
