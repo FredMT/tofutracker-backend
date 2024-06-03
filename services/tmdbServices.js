@@ -21,12 +21,13 @@ async function fetchPoster(id) {
 
   const url = `https://api.themoviedb.org/3/${data.item_type}/${data.item_id}?api_key=${process.env.TMDB_API_KEY}`;
   const response = await axios.get(url);
-  const posterPath = `https://image.tmdb.org/t/p/w780${response.data.poster_path}`;
+  const posterPath = `https://image.tmdb.org/t/p/original${response.data.poster_path}`;
   return {
     item_id: data.item_id,
     item_type: data.item_type,
     item_poster: posterPath,
-    item_title: response.data.title,
+    item_title:
+      data.item_type === "movie" ? response.data.title : response.data.name,
     activity_id: data.id,
   };
 }
