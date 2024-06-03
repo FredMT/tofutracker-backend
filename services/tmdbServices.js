@@ -1,4 +1,5 @@
 const axios = require("axios");
+const supabase = require("../supabaseClient");
 
 async function fetchLogos(type, id) {
   const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}&include_image_language=en`;
@@ -6,15 +7,27 @@ async function fetchLogos(type, id) {
   return response.data.logos;
 }
 
-async function fetchPoster(type, id) {
-  const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${process.env.TMDB_API_KEY}`;
+async function fetchPoster(id) {
+  const { data, error } = await supabase
+    .from("item_lists")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("Error fetching data from Supabase:", error);
+    return;
+  }
+
+  const url = `https://api.themoviedb.org/3/${data.item_type}/${data.item_id}?api_key=${process.env.TMDB_API_KEY}`;
   const response = await axios.get(url);
   const posterPath = `https://image.tmdb.org/t/p/w780${response.data.poster_path}`;
   return {
-    item_id: id,
-    item_type: type,
+    item_id: data.item_id,
+    item_type: data.item_type,
     item_poster: posterPath,
     item_title: response.data.title,
+    activity_id: data.id,
   };
 }
 
@@ -75,6 +88,7 @@ async function searchMovies(query) {
 module.exports = {
   fetchLogos,
   fetchPoster,
+  fetchPosterTest,
   fetchTrending,
   fetchMovieDataFromAPI,
   fetchTVDataFromTMDB,
