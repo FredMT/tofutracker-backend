@@ -9,7 +9,13 @@ async function fetchLogos(type, id) {
 async function fetchPoster(type, id) {
   const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${process.env.TMDB_API_KEY}`;
   const response = await axios.get(url);
-  return `https://image.tmdb.org/t/p/w780${response.data.poster_path}`;
+  const posterPath = `https://image.tmdb.org/t/p/w780${response.data.poster_path}`;
+  return {
+    item_id: id,
+    item_type: type,
+    item_poster: posterPath,
+    item_title: response.data.title,
+  };
 }
 
 async function fetchTrending(type) {
