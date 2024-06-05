@@ -19,6 +19,27 @@ async function fetchPoster(id) {
     return;
   }
 
+  if (data.item_type === "anime") {
+    const { data: animeData, error: animeError } = await supabase
+      .from("anidb_anime")
+      .select("*")
+      .eq("id", data.item_id)
+      .single();
+
+    if (animeError) {
+      console.error("Error fetching data from Supabase:", animeError);
+      return;
+    }
+
+    return {
+      item_id: data.item_id,
+      item_type: data.item_type,
+      item_poster: `https://cdn.anidb.net/images/main/${animeData.poster}`,
+      item_title: animeData.english_title,
+      activity_id: id,
+    };
+  }
+
   const url = `https://api.themoviedb.org/3/${data.item_type}/${data.item_id}?api_key=${process.env.TMDB_API_KEY}`;
   const response = await axios.get(url);
   const posterPath = `https://image.tmdb.org/t/p/original${response.data.poster_path}`;
