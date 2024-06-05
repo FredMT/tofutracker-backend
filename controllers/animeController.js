@@ -21,6 +21,25 @@ async function fetchAnime(req, res) {
   res.json(animeData);
 }
 
+async function checkAnimeInLibrary(req, res) {
+  const { id, user_id } = req.params;
+  const { data, error } = await supabase
+    .from("item_lists")
+    .select("*")
+    .eq("user_id", user_id)
+    .eq("item_id", id)
+    .eq("item_type", "anime")
+    .maybeSingle();
+  if (error) {
+    return res.status(500).send({
+      success: false,
+      message: "Error checking anime in library.",
+      error,
+    });
+  }
+  res.json({ success: true, data });
+}
+
 async function fetchAnimeChain(req, res) {
   const id = req.params.id;
   const animeChain = await getAnimeChain(id);
@@ -197,6 +216,7 @@ async function fetchSimilarAnime(req, res) {
   if (!similarAnimeObjects) {
     try {
       const tmdbIdResult = await fetchTmdbId(id);
+      console.log(tmdbIdResult);
 
       if (!tmdbIdResult.success) {
         return res
@@ -364,6 +384,7 @@ async function checkAndInsertTMDBId(id) {
 
 module.exports = {
   fetchAnime,
+  checkAnimeInLibrary,
   fetchAnimeChain,
   fetchTmdbId,
   fetchAnimeImagesFromTMDB,

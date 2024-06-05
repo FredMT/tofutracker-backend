@@ -7,52 +7,6 @@ async function fetchLogos(type, id) {
   return response.data.logos;
 }
 
-async function fetchPoster(id) {
-  const { data, error } = await supabase
-    .from("item_lists")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) {
-    console.error("Error fetching data from Supabase:", error);
-    return;
-  }
-
-  if (data.item_type === "anime") {
-    const { data: animeData, error: animeError } = await supabase
-      .from("anidb_anime")
-      .select("*")
-      .eq("id", data.item_id)
-      .single();
-
-    if (animeError) {
-      console.error("Error fetching data from Supabase:", animeError);
-      return;
-    }
-
-    return {
-      item_id: data.item_id,
-      item_type: data.item_type,
-      item_poster: `https://cdn.anidb.net/images/main/${animeData.poster}`,
-      item_title: animeData.english_title,
-      activity_id: id,
-    };
-  }
-
-  const url = `https://api.themoviedb.org/3/${data.item_type}/${data.item_id}?api_key=${process.env.TMDB_API_KEY}`;
-  const response = await axios.get(url);
-  const posterPath = `https://image.tmdb.org/t/p/original${response.data.poster_path}`;
-  return {
-    item_id: data.item_id,
-    item_type: data.item_type,
-    item_poster: posterPath,
-    item_title:
-      data.item_type === "movie" ? response.data.title : response.data.name,
-    activity_id: data.id,
-  };
-}
-
 async function fetchTrending(type) {
   const url = `https://api.themoviedb.org/3/trending/${type}/day?api_key=${process.env.TMDB_API_KEY}`;
   const response = await axios.get(url);
@@ -109,7 +63,6 @@ async function searchMovies(query) {
 
 module.exports = {
   fetchLogos,
-  fetchPoster,
   fetchTrending,
   fetchMovieDataFromAPI,
   fetchTVDataFromTMDB,
