@@ -6,7 +6,8 @@ async function fetchPosters(id) {
   const { data: activityList, error } = await supabase
     .from("item_lists")
     .select("*")
-    .eq("user_id", id);
+    .eq("user_id", id)
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching data from Supabase:", error);
