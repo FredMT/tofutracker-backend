@@ -61,6 +61,14 @@ async function searchMovies(query) {
   return response.data;
 }
 
+async function searchTV(query) {
+  const url = `https://api.themoviedb.org/3/search/tv?api_key=${
+    process.env.TMDB_API_KEY
+  }&query=${encodeURIComponent(query)}`;
+  const response = await axios.get(url);
+  return response.data;
+}
+
 module.exports = {
   fetchLogos,
   fetchTrending,
@@ -68,4 +76,5 @@ module.exports = {
   fetchTVDataFromTMDB,
   fetchSeasonDataFromAPI,
   searchMovies,
+  searchTV,
 };

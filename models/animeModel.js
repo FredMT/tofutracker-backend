@@ -58,7 +58,7 @@ async function checkIfAnime(id) {
   }
 
   if (data.length > 0) {
-    return true;
+    return { status: true, message: "This is an anime.", data: data[0] };
   }
   return false;
 }

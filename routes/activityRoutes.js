@@ -4,6 +4,7 @@ const {
   fetchPosters,
   fetchPostersLoggedInUser,
   getActivityItemData,
+  getNumOfLikes,
 } = require("../controllers/activityController");
 const router = express.Router();
 
@@ -23,6 +24,12 @@ router.get("/getactivityitemdata/:id", async (req, res) => {
   const { id } = req.params;
   const activityItemData = await getActivityItemData(id);
   res.send(activityItemData);
+});
+
+router.get("/getnumoflikes/:id", async (req, res) => {
+  const { id } = req.params;
+  const numOfLikes = await getNumOfLikes(id);
+  res.send(numOfLikes);
 });
 
 module.exports = router;

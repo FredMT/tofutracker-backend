@@ -382,6 +382,31 @@ async function checkAndInsertTMDBId(id) {
   }
 }
 
+async function searchAnime(query) {
+  const { data: searchResults, error } = await supabase.rpc(
+    "search_anime_by_title",
+    {
+      prefix: query,
+    }
+  );
+
+  if (error) {
+    console.error("Error searching anime:", error);
+    return res.status(500).send({
+      ok: false,
+      message: "Error searching anime.",
+      error,
+    });
+  }
+
+  return searchResults.map((result) => {
+    if (result.rating === null) {
+      result.rating = 0;
+    }
+    return result;
+  });
+}
+
 module.exports = {
   fetchAnime,
   checkAnimeInLibrary,
@@ -392,4 +417,5 @@ module.exports = {
   fetchRelationsInfo,
   fetchAnimeEpisodes,
   fetchSimilarAnime,
+  searchAnime,
 };

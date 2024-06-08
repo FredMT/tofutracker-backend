@@ -33,7 +33,7 @@ exports.getMovie = async (req, res) => {
     }
 
     if (data) {
-      return res.status(404).send("This is an anime.");
+      return res.status(404).send({ message: "This is an anime.", data });
     }
 
     const movieData = await fetchMovieData(movieId);

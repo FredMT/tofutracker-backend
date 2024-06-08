@@ -220,8 +220,24 @@ async function getActivityItemData(id) {
   }
 }
 
+async function getNumOfLikes(id) {
+  const { data: likes, error } = await supabase
+    .from("activity")
+    .select("likes")
+    .eq("reference_id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching likes data from Supabase:", error);
+    return { success: false, error };
+  }
+
+  return likes;
+}
+
 module.exports = {
   fetchPosters,
   getActivityItemData,
   fetchPostersLoggedInUser,
+  getNumOfLikes,
 };

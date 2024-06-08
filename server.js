@@ -18,7 +18,7 @@ app.use("/api", trendingRoutes);
 app.use("/api", movieRoutes);
 app.use("/api", tvRoutes);
 app.use("/api", animeRoutes);
-app.use("/api/search", searchRoutes);
+app.use("/api", searchRoutes);
 app.use("/api", activityRoutes);
 app.use("/api", commentsRoutes);
 

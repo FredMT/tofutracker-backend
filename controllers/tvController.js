@@ -21,8 +21,7 @@ async function getTV(req, res) {
       const isAnime = await checkIfAnime(tvData.external_ids.tvdb_id);
 
       if (isAnime) {
-        console.log("This is an anime.");
-        res.send("This is an anime.");
+        res.send({ message: "This is an anime.", data: isAnime });
       } else {
         if (tvData.aggregate_credits && tvData.aggregate_credits.cast) {
           tvData.aggregate_credits.cast = tvData.aggregate_credits.cast
