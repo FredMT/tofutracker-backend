@@ -16,14 +16,6 @@ async function enrichWithLogos(items, type) {
           item.logo_path = `https://image.tmdb.org/t/p/original${logos[0].file_path}`;
         }
 
-        if (type === "tv") {
-          const ids = await fetchExternalIds(item.id);
-          if (ids) {
-            item.anidb_id = ids.anidbId;
-            item.tvdb_id = ids.tvdbId;
-          }
-        }
-
         if (item.anidb_id) {
           item.media_type = "anime";
         }
