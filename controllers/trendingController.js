@@ -59,7 +59,7 @@ async function fetchTrendingFromAPIS() {
 
 async function updateTrending(_, res) {
   console.log(
-    "Running cron job every day at 14:15 to fetch and update trending items"
+    "Running cron job every day at 12:59PM to fetch and update trending items"
   );
   const data = await fetchTrendingFromAPIS();
 

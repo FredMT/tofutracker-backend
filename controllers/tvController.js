@@ -17,6 +17,7 @@ async function getTV(req, res) {
   let tvData = await fetchTVDataFromSupabase(id);
   if (!tvData) {
     tvData = await fetchTVDataFromTMDB(id);
+    console.log("fetched from tmdb");
     if (tvData.external_ids.tvdb_id) {
       const isAnime = await checkIfAnime(tvData.external_ids.tvdb_id);
 
@@ -64,7 +65,7 @@ async function getTV(req, res) {
             });
         }
         res.status(200).send(tvData);
-        await insertTVDataIntoSupabase(id, tvData);
+        // await insertTVDataIntoSupabase(id, tvData);
       }
     } else {
       if (tvData.aggregate_credits && tvData.aggregate_credits.cast) {
@@ -108,7 +109,7 @@ async function getTV(req, res) {
           });
       }
       res.status(200).send(tvData);
-      await insertTVDataIntoSupabase(id, tvData);
+      // await insertTVDataIntoSupabase(id, tvData);
     }
   } else {
     res.status(200).send(tvData);
@@ -131,7 +132,7 @@ async function getTVSeason(req, res) {
     if (seasonDataError && seasonDataError.code === "PGRST116") {
       seasonData = await fetchSeasonDataFromAPI(id, season_number);
       res.status(200).send(seasonData);
-      await insertSeasonDataIntoDB(id, season_number, seasonData);
+      // await insertSeasonDataIntoDB(id, season_number, seasonData);
     } else if (seasonDataError) {
       console.log(seasonDataError);
       res
