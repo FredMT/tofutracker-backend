@@ -2,6 +2,21 @@ const supabase = require("../supabaseClient");
 const axios = require("axios");
 
 async function fetchPosters(id) {
+  const { data: activityPrivacy, error: activityPrivacyError } = await supabase
+    .from("profile")
+    .select("activity_is_private")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (activityPrivacyError) {
+    console.error("Error fetching data from Supabase:", activityPrivacyError);
+    return { success: false, message: "Unable to access user settings" };
+  }
+
+  if (activityPrivacy.activity_is_private === true) {
+    return { success: false, message: "Unauthorized" };
+  }
+
   let posters = [];
   const { data: activityList, error } = await supabase
     .from("item_lists")
@@ -75,6 +90,24 @@ async function fetchPosters(id) {
 
 async function fetchPostersLoggedInUser(id, userId) {
   let posters = [];
+
+  const { data: activityPrivacy, error: activityPrivacyError } = await supabase
+    .from("profile")
+    .select("activity_is_private, id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (activityPrivacyError) {
+    console.error("Error fetching data from Supabase:", activityPrivacyError);
+    return { success: false, message: "Unable to access user settings" };
+  }
+
+  if (activityPrivacy.activity_is_private === true) {
+    if (userId !== activityPrivacy.id) {
+      return { success: false, message: "Unauthorized" };
+    }
+  }
+
   const { data: activityList, error } = await supabase
     .from("item_lists")
     .select("*")
