@@ -15,7 +15,7 @@ async function getCommentsLoggedInUser(id, userId) {
     .from("likes")
     .select("*")
     .eq("user_id", userId)
-    .eq("reference_id", id);
+    .eq("activity_id", id);
 
   if (hasLikedError) {
     console.error("Error fetching likes data from Supabase:", hasLikedError);
@@ -26,7 +26,7 @@ async function getCommentsLoggedInUser(id, userId) {
     data.map(async (comment) => {
       const { data: profileData, error: profileError } = await supabase
         .from("profile")
-        .select("username")
+        .select("username, profile_picture_url")
         .eq("id", comment.user_id)
         .single();
 
@@ -35,7 +35,7 @@ async function getCommentsLoggedInUser(id, userId) {
           "Error fetching profile data from Supabase:",
           profileError
         );
-        return { ...comment, username: null };
+        return { ...comment, username: null, profile_picture_url: null };
       }
 
       const {
@@ -52,16 +52,22 @@ async function getCommentsLoggedInUser(id, userId) {
           "Error fetching total comment likes data from Supabase:",
           likesError
         );
-        return { ...comment, username: profileData.username, likes: 0 };
+        return {
+          ...comment,
+          username: profileData.username,
+          profile_picture_url: profileData.profile_picture_url,
+          likes: 0,
+        };
       }
 
       return {
         ...comment,
         username: profileData.username,
         hasLiked: Boolean(
-          hasLiked.filter((like) => like.activity_id === comment.id).length
+          hasLiked.filter((like) => like.reference_id === comment.id).length
         ),
         likes,
+        profile_picture_url: profileData.profile_picture_url,
       };
     })
   );
@@ -84,7 +90,7 @@ async function getComments(id) {
     data.map(async (comment) => {
       const { data: profileData, error: profileError } = await supabase
         .from("profile")
-        .select("username")
+        .select("username, profile_picture_url")
         .eq("id", comment.user_id)
         .single();
 
@@ -93,9 +99,8 @@ async function getComments(id) {
           "Error fetching profile data from Supabase:",
           profileError
         );
-        return { ...comment, username: null };
+        return { ...comment, username: null, profile_picture_url: null };
       }
-
       const {
         data: { likes },
         error: likesError,
@@ -110,12 +115,18 @@ async function getComments(id) {
           "Error fetching total comment likes data from Supabase:",
           likesError
         );
-        return { ...comment, username: profileData.username, likes: 0 };
+        return {
+          ...comment,
+          username: profileData.username,
+          profile_picture_url: profileData.profile_picture_url,
+          likes: 0,
+        };
       }
 
       return {
         ...comment,
         username: profileData.username,
+        profile_picture_url: profileData.profile_picture_url,
         likes,
       };
     })
