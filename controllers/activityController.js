@@ -63,7 +63,7 @@ async function fetchPosters(id) {
         item_id: item.item_id,
         item_created_at: item.created_at,
         item_type: "anime",
-        item_poster: `https://cdn.anidb.net/images/main/${animeData.poster}`,
+        item_poster: `https://tofutrackeranime2.b-cdn.net/posters/${animeData.poster}`,
         item_title: animeData.title,
         activity_id: item.id,
         likes,
@@ -166,7 +166,7 @@ async function fetchPostersLoggedInUser(id, userId) {
         item_id: item.item_id,
         item_created_at: item.created_at,
         item_type: "anime",
-        item_poster: `https://cdn.anidb.net/images/main/${animeData.poster}`,
+        item_poster: `https://tofutrackeranime2.b-cdn.net/posters/${animeData.poster}`,
         item_title: animeData.title,
         activity_id: item.id,
         hasLiked: hasLiked,
@@ -220,7 +220,7 @@ async function getActivityItemData(id) {
     const activityItemData = {
       item_type: activityItem.item_type,
       item_id: activityItem.item_id,
-      item_poster: `https://cdn.anidb.net/images/main/${animeData.poster}`,
+      item_poster: `https://tofutrackeranime2.b-cdn.net/posters/${animeData.poster}`,
       item_title: animeData.title,
     };
 
