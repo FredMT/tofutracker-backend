@@ -8,7 +8,7 @@ const animeRoutes = require("./routes/animeRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const commentsRoutes = require("./routes/commentsRoutes");
 const activityRoutes = require("./routes/activityRoutes");
-const { getBackdropImage } = require("./services/tmdbServices");
+const otherRoutes = require("./routes/otherRoutes");
 
 const app = express();
 app.use(cors());
@@ -22,12 +22,7 @@ app.use("/api", animeRoutes);
 app.use("/api", searchRoutes);
 app.use("/api", activityRoutes);
 app.use("/api", commentsRoutes);
-
-app.get("/api/getbackdropimage/:type/:id", async (req, res) => {
-  const { type, id } = req.params;
-  const backdrop = await getBackdropImage(type, id);
-  res.json(backdrop);
-});
+app.use("/api", otherRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

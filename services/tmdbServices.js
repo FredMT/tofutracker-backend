@@ -180,6 +180,79 @@ async function getBackdropImage(type, id) {
   );
 }
 
+async function getTopTenBackdrops(type, id) {
+  let url = "";
+
+  if (type === "anime") {
+    const { data: fetchAnimeData, error: fetchAnimeError } = await supabase
+      .from("anidb_anime")
+      .select("type")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fetchAnimeError) {
+      console.error(
+        "Error fetching anime type from database:",
+        fetchAnimeError
+      );
+      return { ok: false, error: fetchAnimeError };
+    }
+
+    const animeType = fetchAnimeData.type === "Movie" ? "movie" : "tv";
+
+    const { data: fetchMappingData, error: fetchMappingError } = await supabase
+      .from("anidb_tvdb_tmdb_mapping")
+      .select("tmdb_id, tvdb_id")
+      .eq("anidb_id", id)
+      .maybeSingle();
+
+    if (fetchMappingError) {
+      console.error(
+        "Error fetching mapping data from database:",
+        fetchMappingError
+      );
+      return { ok: false, error: fetchMappingError };
+    }
+
+    if (fetchMappingData.tmdb_id) {
+      url = `https://api.themoviedb.org/3/${animeType}/${fetchMappingData.tmdb_id}/images?api_key=${process.env.TMDB_API_KEY}`;
+    } else if (!fetchMappingData.tmdb_id && fetchMappingData.tvdb_id) {
+      const findResponse = await axios.get(
+        `https://api.themoviedb.org/3/find/${fetchMappingData.tvdb_id}?external_source=tvdb_id&api_key=${process.env.TMDB_API_KEY}`
+      );
+      const tmdbId = findResponse.data[`${animeType}_results`][0]?.id;
+      if (!tmdbId) {
+        return { ok: false, error: "No TMDB ID found" };
+      }
+      url = `https://api.themoviedb.org/3/${animeType}/${tmdbId}/images?api_key=${process.env.TMDB_API_KEY}`;
+    } else {
+      return { ok: false, error: "No valid ID found for fetching images" };
+    }
+    const response = await axios.get(url);
+    const backdrops = response.data.backdrops;
+
+    if (backdrops.length === 0) {
+      return { ok: false, error: "No backdrops found" };
+    }
+
+    const topTenBackdrops = backdrops
+      .sort((a, b) => b.vote_average - a.vote_average)
+      .slice(0, 10);
+    return { ok: true, data: topTenBackdrops };
+  } else {
+    url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}`;
+    const response = await axios.get(url);
+    const backdrops = response.data.backdrops;
+    if (backdrops.length === 0) {
+      return { ok: false, error: "No backdrops found" };
+    }
+    const topTenBackdrops = backdrops
+      .sort((a, b) => b.vote_average - a.vote_average)
+      .slice(0, 10);
+    return { ok: true, data: topTenBackdrops };
+  }
+}
+
 module.exports = {
   fetchLogos,
   fetchTrending,
@@ -189,4 +262,5 @@ module.exports = {
   searchMovies,
   searchTV,
   getBackdropImage,
+  getTopTenBackdrops,
 };
