@@ -1,8 +1,4 @@
-const {
-  fetchLogos,
-  fetchTrending,
-  fetchExternalIds,
-} = require("../services/tmdbServices");
+const { fetchLogos, fetchTrending } = require("../services/tmdbServices");
 const { fetchAnidbTrending } = require("../services/anidbServices");
 const supabase = require("../supabaseClient");
 
@@ -13,7 +9,7 @@ async function enrichWithLogos(items, type) {
         // Fetch logos
         const logos = await fetchLogos(type, item.id);
         if (logos && logos.length > 0) {
-          item.logo_path = `https://image.tmdb.org/t/p/original${logos[0].file_path}`;
+          item.logo_path = `https://image.tmdb.org/t/p/w300${logos[0].file_path}`;
         }
 
         if (item.anidb_id) {
