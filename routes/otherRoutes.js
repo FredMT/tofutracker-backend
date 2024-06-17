@@ -1,8 +1,8 @@
-const express = require("express");
-const {
+import express from "express";
+import {
   getBackdropImage,
   getTopTenBackdrops,
-} = require("../services/tmdbServices");
+} from "../services/tmdbServices.js";
 const router = express.Router();
 
 router.get("/getbackdropimage/:type/:id", async (req, res) => {
@@ -17,4 +17,4 @@ router.get("/gettoptenbackdrops/:type/:id", async (req, res) => {
   res.json(backdrops);
 });
 
-module.exports = router;
+export default router;

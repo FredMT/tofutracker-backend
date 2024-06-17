@@ -1,6 +1,6 @@
-const express = require("express");
+import express from "express";
 
-const {
+import {
   fetchAnime,
   fetchAnimeChain,
   fetchAnimeImagesFromTMDB,
@@ -9,7 +9,7 @@ const {
   fetchAnimeEpisodes,
   fetchSimilarAnime,
   checkAnimeInLibrary,
-} = require("../controllers/animeController");
+} from "../controllers/animeController.js";
 
 const router = express.Router();
 
@@ -22,4 +22,4 @@ router.get("/getanimeepisodes/:id/:start_date/:end_date", fetchAnimeEpisodes);
 router.get("/getsimilaranime/:type/:id", fetchSimilarAnime);
 router.get("/checkanimeinlibrary/:id/:user_id", checkAnimeInLibrary);
 
-module.exports = router;
+export default router;

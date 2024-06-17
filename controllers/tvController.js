@@ -1,8 +1,8 @@
-const { checkIfAnime } = require("../models/animeModel");
-const {
+import { checkIfAnime } from "../models/animeModel.js";
+import {
   fetchTVDataFromTMDB,
   fetchSeasonDataFromAPI,
-} = require("../services/tmdbServices");
+} from "../services/tmdbServices.js";
 
 function processTVData(tvData) {
   if (tvData.aggregate_credits && tvData.aggregate_credits.cast) {
@@ -73,7 +73,4 @@ async function getTVSeason(req, res) {
   }
 }
 
-module.exports = {
-  getTV,
-  getTVSeason,
-};
+export { getTV, getTVSeason };

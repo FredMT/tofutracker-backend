@@ -1,5 +1,5 @@
-const supabase = require("../supabaseClient");
-const axios = require("axios");
+import supabase from "../supabaseClient.js";
+import axios from "axios";
 
 async function fetchPosters(id) {
   const { data: activityPrivacy, error: activityPrivacyError } = await supabase
@@ -316,7 +316,7 @@ async function getNumOfLikes(id) {
   return likes;
 }
 
-module.exports = {
+export {
   fetchPosters,
   getActivityItemData,
   fetchPostersLoggedInUser,

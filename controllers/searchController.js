@@ -1,5 +1,5 @@
-const { searchMovies, searchTV } = require("../services/tmdbServices");
-const { searchAnime } = require("../controllers/animeController");
+import { searchMovies, searchTV } from "../services/tmdbServices.js";
+import { searchAnime } from "../controllers/animeController.js";
 
 async function search(req, res) {
   try {
@@ -21,4 +21,4 @@ async function search(req, res) {
   }
 }
 
-module.exports = { search };
+export { search };

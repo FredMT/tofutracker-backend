@@ -1,4 +1,4 @@
-const supabase = require("../supabaseClient");
+import supabase from "../supabaseClient.js";
 
 async function getAnime(id) {
   const { data, error } = await supabase.rpc("get_anime_data", {
@@ -159,7 +159,7 @@ async function getAnidbIDFromTVDBId(id) {
   }
 }
 
-module.exports = {
+export {
   getAnime,
   getAnimeChain,
   checkIfAnime,

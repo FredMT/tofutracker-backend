@@ -1,5 +1,5 @@
-const axios = require("axios");
-const xml2js = require("xml2js");
+import axios from "axios";
+import xml2js from "xml2js";
 
 async function fetchAnidbTrending() {
   const url = `http://api.anidb.net:9001/httpapi?client=${process.env.ANIDB_CLIENT_NAME}&clientver=${process.env.ANIDB_CLIENT_VERSION}&protover=1&request=hotanime`;
@@ -29,4 +29,4 @@ async function fetchAnidbTrending() {
   return formattedResult;
 }
 
-module.exports = { fetchAnidbTrending };
+export { fetchAnidbTrending };

@@ -1,4 +1,4 @@
-const {
+import {
   getAnime,
   getAnimeChain,
   getMapping,
@@ -6,9 +6,9 @@ const {
   getRelatedAnimeInfo,
   getSimilarAnimeDetails,
   getMultipleSimilarAnimeDetails,
-} = require("../models/animeModel");
+} from "../models/animeModel.js";
 
-const supabase = require("../supabaseClient");
+import supabase from "../supabaseClient.js";
 
 async function fetchAnime(req, res) {
   const id = req.params.id;
@@ -312,7 +312,7 @@ async function searchAnime(query) {
   return { success: true, data: animeAnidbFinalSearchData };
 }
 
-module.exports = {
+export {
   fetchAnime,
   checkAnimeInLibrary,
   fetchAnimeChain,

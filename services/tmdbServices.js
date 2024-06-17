@@ -1,5 +1,5 @@
-const axios = require("axios");
-const supabase = require("../supabaseClient");
+import axios from "axios";
+import supabase from "../supabaseClient.js";
 
 async function fetchLogos(type, id) {
   const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}&include_image_language=en`;
@@ -253,7 +253,7 @@ async function getTopTenBackdrops(type, id) {
   }
 }
 
-module.exports = {
+export {
   fetchLogos,
   fetchTrending,
   fetchMovieDataFromAPI,

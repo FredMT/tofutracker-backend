@@ -1,6 +1,6 @@
-const { fetchLogos, fetchTrending } = require("../services/tmdbServices");
-const { fetchAnidbTrending } = require("../services/anidbServices");
-const supabase = require("../supabaseClient");
+import { fetchLogos, fetchTrending } from "../services/tmdbServices.js";
+import { fetchAnidbTrending } from "../services/anidbServices.js";
+import supabase from "../supabaseClient.js";
 
 async function enrichWithLogos(items, type) {
   const enrichedItems = await Promise.all(
@@ -71,4 +71,4 @@ async function updateTrending(_, res) {
   return res.status(200).json({ message: "Trending items updated" });
 }
 
-module.exports = { getTrending, fetchTrendingFromAPIS, updateTrending };
+export { getTrending, fetchTrendingFromAPIS, updateTrending };

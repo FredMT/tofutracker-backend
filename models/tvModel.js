@@ -1,4 +1,4 @@
-const supabase = require("../supabaseClient");
+import supabase from "../supabaseClient.js";
 
 async function fetchTVDataFromSupabase(id) {
   let { data, error } = await supabase
@@ -49,7 +49,7 @@ async function insertSeasonDataIntoDB(id, season_number, seasonData) {
   }
 }
 
-module.exports = {
+export {
   fetchTVDataFromSupabase,
   insertTVDataIntoSupabase,
   fetchSeasonDataFromDB,

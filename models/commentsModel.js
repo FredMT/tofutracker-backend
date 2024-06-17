@@ -1,4 +1,4 @@
-const supabase = require("../supabaseClient");
+import supabase from "../supabaseClient.js";
 
 async function getCommentsLoggedInUser(id, userId) {
   const { data, error } = await supabase
@@ -135,4 +135,4 @@ async function getComments(id) {
   return enhancedData;
 }
 
-module.exports = { getCommentsLoggedInUser, getComments };
+export { getCommentsLoggedInUser, getComments };

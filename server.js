@@ -1,14 +1,15 @@
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
-const trendingRoutes = require("./routes/trendingRoutes");
-const movieRoutes = require("./routes/movieRoutes");
-const tvRoutes = require("./routes/tvRoutes");
-const animeRoutes = require("./routes/animeRoutes");
-const searchRoutes = require("./routes/searchRoutes");
-const commentsRoutes = require("./routes/commentsRoutes");
-const activityRoutes = require("./routes/activityRoutes");
-const otherRoutes = require("./routes/otherRoutes");
+import express from "express";
+import cors from "cors";
+import "dotenv/config";
+import trendingRoutes from "./routes/trendingRoutes.js";
+import movieRoutes from "./routes/movieRoutes.js";
+import tvRoutes from "./routes/tvRoutes.js";
+import animeRoutes from "./routes/animeRoutes.js";
+import searchRoutes from "./routes/searchRoutes.js";
+import commentsRoutes from "./routes/commentsRoutes.js";
+import activityRoutes from "./routes/activityRoutes.js";
+import otherRoutes from "./routes/otherRoutes.js";
+import { createClient } from "redis";
 
 const app = express();
 app.use(cors());

@@ -1,12 +1,12 @@
-const { fetchMovieDataFromAPI } = require("../services/tmdbServices");
-const supabase = require("../supabaseClient");
+import { fetchMovieDataFromAPI } from "../services/tmdbServices.js";
+import supabase from "../supabaseClient.js";
 
 const fetchMovieData = async (movieId) => {
   const movieResponse = await fetchMovieDataFromAPI(movieId);
   return movieResponse;
 };
 
-exports.getMovie = async (req, res) => {
+export const getMovie = async (req, res) => {
   try {
     const movieId = req.params.id;
 

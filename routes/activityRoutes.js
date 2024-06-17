@@ -1,11 +1,12 @@
-const express = require("express");
+import express from "express";
 
-const {
+import {
   fetchPosters,
   fetchPostersLoggedInUser,
   getActivityItemData,
   getNumOfLikes,
-} = require("../controllers/activityController");
+} from "../controllers/activityController.js";
+
 const router = express.Router();
 
 router.get("/getposters/:id", async (req, res) => {
@@ -32,4 +33,4 @@ router.get("/getnumoflikes/:id", async (req, res) => {
   res.send(numOfLikes);
 });
 
-module.exports = router;
+export default router;

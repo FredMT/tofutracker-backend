@@ -1,9 +1,9 @@
-const express = require("express");
+import express from "express";
 
-const {
+import {
   getCommentsLoggedInUser,
   getComments,
-} = require("../models/commentsModel");
+} from "../models/commentsModel.js";
 
 const router = express.Router();
 
@@ -19,4 +19,4 @@ router.get("/comments/:id/:userId", async (req, res) => {
   res.send(comments);
 });
 
-module.exports = router;
+export default router;

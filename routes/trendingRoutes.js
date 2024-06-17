@@ -1,12 +1,12 @@
-const express = require("express");
-const {
+import express from "express";
+import {
   getTrending,
   updateTrending,
-} = require("../controllers/trendingController");
+} from "../controllers/trendingController.js";
 
 const router = express.Router();
 
 router.get("/trending", getTrending);
 router.get("/trending/update", updateTrending);
 
-module.exports = router;
+export default router;
