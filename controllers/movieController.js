@@ -1,17 +1,8 @@
-const { fetchExistingMovie, insertMovieData } = require("../models/movieModel");
 const { fetchMovieDataFromAPI } = require("../services/tmdbServices");
 const supabase = require("../supabaseClient");
 
 const fetchMovieData = async (movieId) => {
-  const existingMovie = await fetchExistingMovie(movieId);
-  if (existingMovie) {
-    return existingMovie.movies_data;
-  }
-
   const movieResponse = await fetchMovieDataFromAPI(movieId);
-
-  await insertMovieData(movieResponse, movieId);
-
   return movieResponse;
 };
 
