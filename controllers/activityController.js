@@ -45,8 +45,26 @@ async function fetchPosters(id) {
     likesData.map((like) => [like.reference_id, like.likes])
   );
 
+  const { data: commentsData, error: commentsError } = await supabase
+    .from("comments")
+    .select("activity_id");
+
+  if (commentsError) {
+    console.error("Error fetching comments data from Supabase:", commentsError);
+    return { success: false, error: commentsError };
+  }
+
+  const commentsMap = new Map();
+  for (const comment of commentsData) {
+    commentsMap.set(
+      comment.activity_id,
+      (commentsMap.get(comment.activity_id) || 0) + 1
+    );
+  }
+
   for (const item of activityList) {
     const likes = likesMap.get(item.id) || 0;
+    const comments = commentsMap.get(item.id) || 0;
     if (item.item_type === "anime") {
       const { data: animeData, error: animeError } = await supabase
         .from("anidb_anime")
@@ -66,7 +84,10 @@ async function fetchPosters(id) {
         item_poster: `https://tofutrackeranime2.b-cdn.net/posters/${animeData.poster}`,
         item_title: animeData.title,
         activity_id: item.id,
+        list_type: item.list_type,
+        rating: item.rating,
         likes,
+        comments,
       });
     } else {
       const url = `https://api.themoviedb.org/3/${item.item_type}/${item.item_id}?api_key=${process.env.TMDB_API_KEY}`;
@@ -80,7 +101,10 @@ async function fetchPosters(id) {
         item_title:
           item.item_type === "movie" ? response.data.title : response.data.name,
         activity_id: item.id,
+        list_type: item.list_type,
+        rating: item.rating,
         likes,
+        comments,
       });
     }
   }
@@ -147,8 +171,26 @@ async function fetchPostersLoggedInUser(id, userId) {
 
   const likedActivityIds = new Set(likesData.map((like) => like.reference_id));
 
+  const { data: commentsData, error: commentsError } = await supabase
+    .from("comments")
+    .select("activity_id");
+
+  if (commentsError) {
+    console.error("Error fetching comments data from Supabase:", commentsError);
+    return { success: false, error: commentsError };
+  }
+
+  const commentsMap = new Map();
+  for (const comment of commentsData) {
+    commentsMap.set(
+      comment.activity_id,
+      (commentsMap.get(comment.activity_id) || 0) + 1
+    );
+  }
+
   for (const item of activityList) {
     const likes = totalLikesMap.get(item.id) || 0;
+    const comments = commentsMap.get(item.id) || 0;
     const hasLiked = likedActivityIds.has(item.id);
     if (item.item_type === "anime") {
       const { data: animeData, error: animeError } = await supabase
@@ -170,7 +212,10 @@ async function fetchPostersLoggedInUser(id, userId) {
         item_title: animeData.title,
         activity_id: item.id,
         hasLiked: hasLiked,
+        list_type: item.list_type,
+        rating: item.rating,
         likes,
+        comments,
       });
     } else {
       const url = `https://api.themoviedb.org/3/${item.item_type}/${item.item_id}?api_key=${process.env.TMDB_API_KEY}`;
@@ -185,7 +230,10 @@ async function fetchPostersLoggedInUser(id, userId) {
           item.item_type === "movie" ? response.data.title : response.data.name,
         activity_id: item.id,
         hasLiked: hasLiked,
+        list_type: item.list_type,
+        rating: item.rating,
         likes,
+        comments,
       });
     }
   }
