@@ -26,6 +26,7 @@ jobs:
             echo "SUPABASE_ANON_KEY=${{secrets.SUPABASE_ANON_KEY}}" >> .env
             echo "ANIDB_CLIENT_VERSION=${{secrets.ANIDB_CLIENT_VERSION}}" >> .env
             echo "ANIDB_CLIENT_NAME=${{secrets.ANIDB_CLIENT_NAME}}" >> .env
+            echo "IOREDIS=${{secrets.IOREDIS}}" >> .env
             npm install
             pm2 delete 'npm start'
             pm2 save
