@@ -9,7 +9,6 @@ import searchRoutes from "./routes/searchRoutes.js";
 import commentsRoutes from "./routes/commentsRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
 import otherRoutes from "./routes/otherRoutes.js";
-import { createClient } from "redis";
 
 const app = express();
 app.use(cors());
