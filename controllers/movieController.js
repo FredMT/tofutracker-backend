@@ -1,5 +1,6 @@
 import { fetchMovieDataFromAPI } from "../services/tmdbServices.js";
 import supabase from "../supabaseClient.js";
+import redis from "../ioredisClient.js";
 
 const fetchMovieData = async (movieId) => {
   const movieResponse = await fetchMovieDataFromAPI(movieId);
@@ -9,6 +10,13 @@ const fetchMovieData = async (movieId) => {
 export const getMovie = async (req, res) => {
   try {
     const movieId = req.params.id;
+    const cacheKey = `movie:${movieId}`;
+
+    // Try to fetch from cache first
+    const cachedMovie = await redis.get(cacheKey);
+    if (cachedMovie) {
+      return res.json(JSON.parse(cachedMovie));
+    }
 
     const { data, error } = await supabase
       .from("anidb_tvdb_tmdb_mapping")
@@ -33,6 +41,7 @@ export const getMovie = async (req, res) => {
       return res.status(404).send("Movie not found.");
     }
 
+    await redis.set(cacheKey, JSON.stringify(movieData), "EX", 900);
     res.json(movieData);
   } catch (error) {
     res

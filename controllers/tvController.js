@@ -3,6 +3,7 @@ import {
   fetchTVDataFromTMDB,
   fetchSeasonDataFromAPI,
 } from "../services/tmdbServices.js";
+import redis from "../ioredisClient.js";
 
 function processTVData(tvData) {
   if (tvData.aggregate_credits && tvData.aggregate_credits.cast) {
@@ -45,6 +46,12 @@ function processTVData(tvData) {
 
 async function getTV(req, res) {
   const { id } = req.params;
+  const cacheKey = `tv:${id}`;
+
+  const cachedTV = await redis.get(cacheKey);
+  if (cachedTV) {
+    return res.json(JSON.parse(cachedTV));
+  }
 
   const tvData = await fetchTVDataFromTMDB(id);
   if (tvData.external_ids.tvdb_id) {
@@ -57,14 +64,23 @@ async function getTV(req, res) {
 
   processTVData(tvData);
   res.status(200).send(tvData);
+
+  await redis.set(cacheKey, JSON.stringify(tvData), "EX", 900);
 }
 
 async function getTVSeason(req, res) {
   const { id, season_number } = req.params;
+  const cacheKey = `tv:${id}:season:${season_number}`;
+
+  const cachedSeason = await redis.get(cacheKey);
+  if (cachedSeason) {
+    return res.json(JSON.parse(cachedSeason));
+  }
 
   try {
     const seasonData = await fetchSeasonDataFromAPI(id, season_number);
     res.status(200).send(seasonData);
+    await redis.set(cacheKey, JSON.stringify(seasonData), "EX", 900);
   } catch (error) {
     console.log(error);
     res

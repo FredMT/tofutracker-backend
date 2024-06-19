@@ -9,14 +9,24 @@ import {
 } from "../models/animeModel.js";
 
 import supabase from "../supabaseClient.js";
+import redis from "../ioredisClient.js";
 
 async function fetchAnime(req, res) {
   const id = req.params.id;
+  const cacheKey = `anime:${id}`;
+
+  const cachedAnime = await redis.get(cacheKey);
+  if (cachedAnime) {
+    return res.json(JSON.parse(cachedAnime));
+  }
+
   const animeData = await getAnime(id);
 
   if (!animeData) {
     return res.status(404).send({ message: "Anime not found." });
   }
+
+  await redis.set(cacheKey, JSON.stringify(animeData), "EX", 900);
 
   res.json(animeData);
 }
@@ -42,6 +52,13 @@ async function checkAnimeInLibrary(req, res) {
 
 async function fetchAnimeChain(req, res) {
   const id = req.params.id;
+  const cacheKey = `anime:${id}:chain`;
+
+  const cachedAnimeChain = await redis.get(cacheKey);
+  if (cachedAnimeChain) {
+    return res.json(JSON.parse(cachedAnimeChain));
+  }
+
   const animeChain = await getAnimeChain(id);
 
   if (!animeChain) {
@@ -49,6 +66,13 @@ async function fetchAnimeChain(req, res) {
       .status(404)
       .send({ success: false, message: "Anime chain not found." });
   }
+
+  await redis.set(
+    cacheKey,
+    JSON.stringify({ success: true, data: animeChain }),
+    "EX",
+    900
+  );
 
   res.json({ success: true, data: animeChain });
 }
@@ -102,6 +126,13 @@ async function fetchTmdbId(id) {
 
 async function fetchAnimeImagesFromTMDB(req, res) {
   const { type, id } = req.params;
+  const cacheKey = `anime:${id}:images`;
+
+  const cachedAnimeImages = await redis.get(cacheKey);
+  if (cachedAnimeImages) {
+    return res.json(JSON.parse(cachedAnimeImages));
+  }
+
   const tmdbIdResult = await fetchTmdbId(id);
   if (!tmdbIdResult.success) {
     return res
@@ -112,7 +143,12 @@ async function fetchAnimeImagesFromTMDB(req, res) {
   try {
     const response = await fetch(url);
     const data = await response.json();
-    return res.json({ success: true, data: data });
+    const formattedData = {
+      success: true,
+      data,
+    };
+    await redis.set(cacheKey, JSON.stringify(formattedData), "EX", 900);
+    return res.json({ success: true, data: formattedData });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
   }
