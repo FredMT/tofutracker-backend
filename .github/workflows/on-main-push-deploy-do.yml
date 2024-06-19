@@ -17,8 +17,17 @@ jobs:
           script: |
             export NVM_DIR=~/.nvm
             source ~/.nvm/nvm.sh
-            rm -rf test
-            mkdir test
-            cd test
+            rm -rf tofutracker-backend
             git clone https://github.com/FredMT/tofutracker-backend.git
+            cd tofutracker-backend
+            touch .env
+            echo "TMDB_API_KEY=${{secrets.TMDB_API_KEY}}" >> .env
+            echo "SUPABASE_URL=${{secrets.SUPABASE_URL}}" >> .env
+            echo "SUPABASE_ANON_KEY=${{secrets.SUPABASE_ANON_KEY}}" >> .env
+            echo "ANIDB_CLIENT_VERSION=${{secrets.ANIDB_CLIENT_VERSION}}" >> .env
+            echo "ANIDB_CLIENT_NAME=${{secrets.ANIDB_CLIENT_NAME}}" >> .env
+            npm install
+            pm2 delete 'npm start'
+            pm2 save
+            pm2 start 'npm start'
             echo 'Deployment to digital ocean finished'
