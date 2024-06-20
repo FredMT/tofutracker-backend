@@ -1,5 +1,6 @@
 import axios from "axios";
 import supabase from "../supabaseClient.js";
+import redis from "../ioredisClient.js";
 
 async function fetchLogos(type, id) {
   const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}&include_image_language=en`;
@@ -70,11 +71,16 @@ async function searchTV(query) {
 }
 
 async function getBackdropImage(type, id) {
+  const cacheKey = `backdrop:${type}:${id}`;
+  const cachedBackdrop = await redis.get(cacheKey);
+  if (cachedBackdrop) {
+    return JSON.parse(cachedBackdrop);
+  }
+
   let url;
-  if (type === "movie" || type === "tv") {
+  if (type !== "anime") {
     url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}`;
   } else if (type === "anime") {
-    // Fetch the anime type and TMDB/TVDB ID from the database
     const { data: animeData, error: animeError } = await supabase
       .from("anidb_anime")
       .select("type")
@@ -167,10 +173,18 @@ async function getBackdropImage(type, id) {
   const sortedBackdrops = backdrops.sort(
     (a, b) => b.vote_average - a.vote_average
   );
+
   const highestVoteCountImage =
     sortedBackdrops[0].vote_average === 0
       ? sortedBackdrops[0]
       : sortedBackdrops.find((img) => img.vote_average !== 0);
+
+  await redis.set(
+    cacheKey,
+    JSON.stringify(highestVoteCountImage.file_path),
+    "EX",
+    900
+  );
 
   return (
     highestVoteCountImage.file_path || {
@@ -181,6 +195,12 @@ async function getBackdropImage(type, id) {
 }
 
 async function getTopTenBackdrops(type, id) {
+  const cacheKey = `toptenbackdrops:${type}:${id}`;
+  const cachedBackdrop = await redis.get(cacheKey);
+  if (cachedBackdrop) {
+    return JSON.parse(cachedBackdrop);
+  }
+
   let url = "";
 
   if (type === "anime") {
@@ -238,6 +258,14 @@ async function getTopTenBackdrops(type, id) {
     const topTenBackdrops = backdrops
       .sort((a, b) => b.vote_average - a.vote_average)
       .slice(0, 10);
+
+    await redis.set(
+      cacheKey,
+      JSON.stringify({ ok: true, data: topTenBackdrops }),
+      "EX",
+      900
+    );
+
     return { ok: true, data: topTenBackdrops };
   } else {
     url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}`;
@@ -249,6 +277,13 @@ async function getTopTenBackdrops(type, id) {
     const topTenBackdrops = backdrops
       .sort((a, b) => b.vote_average - a.vote_average)
       .slice(0, 10);
+
+    await redis.set(
+      cacheKey,
+      JSON.stringify({ ok: true, data: topTenBackdrops }),
+      "EX",
+      900
+    );
     return { ok: true, data: topTenBackdrops };
   }
 }

@@ -1,4 +1,5 @@
 import supabase from "../supabaseClient.js";
+import redis from "../ioredisClient.js";
 
 async function getAnime(id) {
   const { data, error } = await supabase.rpc("get_anime_data", {

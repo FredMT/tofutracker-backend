@@ -78,6 +78,11 @@ async function fetchAnimeChain(req, res) {
 }
 
 async function fetchTmdbId(id) {
+  const cacheKey = `anime:${id}:mapping`;
+  const cachedAnimeMapping = await redis.get(cacheKey);
+  if (cachedAnimeMapping) {
+    return JSON.parse(cachedAnimeMapping);
+  }
   const data = await getMapping(id);
 
   if (!data) {
@@ -89,6 +94,12 @@ async function fetchTmdbId(id) {
   }
 
   if (data && data.tmdb_id) {
+    await redis.set(
+      cacheKey,
+      JSON.stringify({ success: true, tmdb_id: data.tmdb_id }),
+      "EX",
+      900
+    );
     return { success: true, tmdb_id: data.tmdb_id };
   }
 
@@ -113,6 +124,15 @@ async function fetchTmdbId(id) {
             };
           }
 
+          await redis.set(
+            cacheKey,
+            JSON.stringify({
+              success: true,
+              tmdb_id: tvResult.id,
+            }),
+            "EX",
+            900
+          );
           return { success: true, tmdb_id: tvResult.id };
         } else {
           return { success: false, status: 500, message: "TVDB ID not found." };
@@ -143,11 +163,12 @@ async function fetchAnimeImagesFromTMDB(req, res) {
   try {
     const response = await fetch(url);
     const data = await response.json();
-    const formattedData = {
-      success: true,
-      data,
-    };
-    await redis.set(cacheKey, JSON.stringify(formattedData), "EX", 900);
+    await redis.set(
+      cacheKey,
+      JSON.stringify({ success: true, data }),
+      "EX",
+      900
+    );
     return res.json({ success: true, data: formattedData });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
@@ -156,6 +177,11 @@ async function fetchAnimeImagesFromTMDB(req, res) {
 
 async function fetchRelations(req, res) {
   const id = req.params.id;
+  const cacheKey = `anime:${id}:relations`;
+  const cachedAnimeRelations = await redis.get(cacheKey);
+  if (cachedAnimeRelations) {
+    return res.json(JSON.parse(cachedAnimeRelations));
+  }
   const relations = await getRelations(id);
   if (!relations || relations.length === 0) {
     return res.status(200).send({
@@ -164,6 +190,16 @@ async function fetchRelations(req, res) {
       data: "No relations available for this anime.",
     });
   }
+  await redis.set(
+    cacheKey,
+    JSON.stringify({
+      success: true,
+      message: "Anime relations found",
+      data: relations,
+    }),
+    "EX",
+    900
+  );
   res.json({
     success: true,
     message: "Anime relations found",
@@ -173,6 +209,11 @@ async function fetchRelations(req, res) {
 
 async function fetchRelationsInfo(req, res) {
   const id = req.params.id;
+  const cacheKey = `anime:${id}:relationsInfo`;
+  const cachedAnimeRelationsInfo = await redis.get(cacheKey);
+  if (cachedAnimeRelationsInfo) {
+    return res.json(JSON.parse(cachedAnimeRelationsInfo));
+  }
 
   const data = await getRelatedAnimeInfo(id);
 
@@ -182,11 +223,23 @@ async function fetchRelationsInfo(req, res) {
       .send({ success: false, message: data.message });
   }
 
+  await redis.set(
+    cacheKey,
+    JSON.stringify({ success: true, data: data.data }),
+    "EX",
+    900
+  );
+
   return res.json({ success: true, data: data.data });
 }
 
 async function fetchAnimeEpisodes(req, res) {
   const { id, start_date, end_date } = req.params;
+  const cacheKey = `anime:${id}:episodes`;
+  const cachedAnimeEpisodes = await redis.get(cacheKey);
+  if (cachedAnimeEpisodes) {
+    return res.json(JSON.parse(cachedAnimeEpisodes));
+  }
   const tmdbIdResult = await fetchTmdbId(id);
   if (!tmdbIdResult.success) {
     return res
@@ -226,6 +279,13 @@ async function fetchAnimeEpisodes(req, res) {
       }
     }
 
+    await redis.set(
+      cacheKey,
+      JSON.stringify({ success: true, data: episodesWithinDateRange }),
+      "EX",
+      900
+    );
+
     res.json({ success: true, data: episodesWithinDateRange });
   } catch (error) {
     console.error("Error fetching anime episodes:", error);
@@ -237,6 +297,11 @@ async function fetchAnimeEpisodes(req, res) {
 
 async function fetchSimilarAnime(req, res) {
   const { id, type } = req.params;
+  const cacheKey = `anime:${id}:similarAnime`;
+  const cachedAnimeSimilar = await redis.get(cacheKey);
+  if (cachedAnimeSimilar) {
+    return res.json(JSON.parse(cachedAnimeSimilar));
+  }
   const animeData = await getAnime(id);
 
   if (!animeData) {
@@ -302,6 +367,13 @@ async function fetchSimilarAnime(req, res) {
     if (!similarAnimeDetails || similarAnimeDetails.length === 0) {
       return res.send({ success: false, message: "No similar anime found." });
     }
+
+    await redis.set(
+      cacheKey,
+      JSON.stringify({ success: true, data: similarAnimeDetails }),
+      "EX",
+      900
+    );
 
     return res.send({ success: true, data: similarAnimeDetails });
   } catch (error) {

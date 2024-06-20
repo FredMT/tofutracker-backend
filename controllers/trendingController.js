@@ -1,6 +1,7 @@
 import { fetchLogos, fetchTrending } from "../services/tmdbServices.js";
 import { fetchAnidbTrending } from "../services/anidbServices.js";
 import supabase from "../supabaseClient.js";
+import redis from "../ioredisClient.js";
 
 async function enrichWithLogos(items, type) {
   const enrichedItems = await Promise.all(
@@ -26,6 +27,10 @@ async function enrichWithLogos(items, type) {
 }
 
 async function getTrending(_, res) {
+  let cachedData = await redis.get("trendingData");
+  if (cachedData) {
+    return res.json(JSON.parse(cachedData));
+  }
   const { data, error } = await supabase
     .from("trending")
     .select("movies, tvShows, anime")
@@ -35,6 +40,8 @@ async function getTrending(_, res) {
     console.error("Supabase error:", error);
     return res.status(500).json({ error: error.message });
   }
+
+  await redis.set("trendingData", JSON.stringify(data[0]), "EX", 86400);
 
   return res.json(data[0]);
 }
@@ -67,6 +74,8 @@ async function updateTrending(_, res) {
   }
 
   console.log("Cron job done");
+
+  await redis.set("trendingData", JSON.stringify(data), "EX", 86400);
 
   return res.status(200).json({ message: "Trending items updated" });
 }
