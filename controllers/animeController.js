@@ -10,15 +10,10 @@ import {
 
 import supabase from "../supabaseClient.js";
 import redis from "../ioredisClient.js";
+import axios from "axios";
 
 async function fetchAnime(req, res) {
   const id = req.params.id;
-  const cacheKey = `anime:${id}`;
-
-  const cachedAnime = await redis.get(cacheKey);
-  if (cachedAnime) {
-    return res.json(JSON.parse(cachedAnime));
-  }
 
   const animeData = await getAnime(id);
 
@@ -26,9 +21,72 @@ async function fetchAnime(req, res) {
     return res.status(404).send({ message: "Anime not found." });
   }
 
-  await redis.set(cacheKey, JSON.stringify(animeData), "EX", 900);
+  const { data: fetchImdbID, error: fetchImdbIDError } = await supabase
+    .from("anidb_tvdb_tmdb_mapping")
+    .select("imdb_id")
+    .eq("anidb_id", id)
+    .maybeSingle();
 
-  res.json(animeData);
+  if (fetchImdbIDError) {
+    return res.json(animeData);
+  }
+
+  if (animeData[0].anime[0].type === "Movie") {
+    return res.json(animeData);
+  }
+
+  try {
+    const nextEpisodeResponse = await axios.get(
+      `https://api.trakt.tv/shows/${fetchImdbID.imdb_id}/next_episode?extended=full`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "trakt-api-version": "2",
+          "trakt-api-key": process.env.TRAKT_CLIENT_ID,
+        },
+      }
+    );
+
+    const next_episode = {
+      season: nextEpisodeResponse.data.season,
+      number: nextEpisodeResponse.data.number,
+      title: nextEpisodeResponse.data.title,
+      overview: nextEpisodeResponse.data.overview,
+      runtime: nextEpisodeResponse.data.runtime,
+      episode_type: nextEpisodeResponse.data.episode_type,
+      first_aired:
+        new Date(nextEpisodeResponse.data.first_aired).getTime() / 1000,
+    };
+
+    const lastEpisodeResponse = await axios.get(
+      `https://api.trakt.tv/shows/${fetchImdbID.imdb_id}/last_episode?extended=full`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "trakt-api-version": "2",
+          "trakt-api-key": process.env.TRAKT_CLIENT_ID,
+        },
+      }
+    );
+
+    const previous_episode = {
+      season: lastEpisodeResponse.data.season,
+      number: lastEpisodeResponse.data.number,
+      title: lastEpisodeResponse.data.title,
+      overview: lastEpisodeResponse.data.overview,
+      runtime: lastEpisodeResponse.data.runtime,
+      episode_type: lastEpisodeResponse.data.episode_type,
+      first_aired:
+        new Date(lastEpisodeResponse.data.first_aired).getTime() / 1000,
+    };
+    res.json({ ...animeData, next_episode, previous_episode });
+  } catch (error) {
+    return res.status(500).send({
+      success: false,
+      message: "Error fetching episode data.",
+      error,
+    });
+  }
 }
 
 async function checkAnimeInLibrary(req, res) {
@@ -169,7 +227,7 @@ async function fetchAnimeImagesFromTMDB(req, res) {
       "EX",
       900
     );
-    return res.json({ success: true, data: formattedData });
+    return res.json({ success: true, data });
   } catch (error) {
     res.status(500).send({ success: false, message: error.message });
   }

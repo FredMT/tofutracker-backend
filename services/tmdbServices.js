@@ -2,26 +2,21 @@ import axios from "axios";
 import supabase from "../supabaseClient.js";
 import redis from "../ioredisClient.js";
 
-async function fetchLogos(type, id) {
-  const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.TMDB_API_KEY}&include_image_language=en`;
-  const response = await axios.get(url);
-  return response.data.logos;
-}
-
 async function fetchTrending(type) {
   const url = `https://api.themoviedb.org/3/trending/${type}/day?api_key=${process.env.TMDB_API_KEY}`;
   const response = await axios.get(url);
   let results = response.data.results;
 
-  if (type === "tv") {
-    results = results.map((item) => {
-      if (item.name) {
-        item.title = item.name;
-        delete item.name;
+  results = await Promise.all(
+    results.map(async (item) => {
+      if (item.media_type === "movie") {
+        return await fetchMovieDataFromAPI(item.id);
+      } else if (item.media_type === "tv") {
+        return await fetchTVDataFromTMDB(item.id);
       }
       return item;
-    });
-  }
+    })
+  );
 
   return results.sort((a, b) => b.popularity - a.popularity).slice(0, 10);
 }
@@ -289,7 +284,6 @@ async function getTopTenBackdrops(type, id) {
 }
 
 export {
-  fetchLogos,
   fetchTrending,
   fetchMovieDataFromAPI,
   fetchTVDataFromTMDB,
